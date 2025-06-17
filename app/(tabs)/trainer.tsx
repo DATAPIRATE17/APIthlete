@@ -1,118 +1,327 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Modal,
-  TextInput,
+  Alert,
+  Dimensions,
+  Image,
 } from 'react-native';
 import { useTheme } from '@/components/ThemeProvider';
-import { 
-  Users, 
-  Plus, 
-  Search, 
-  Filter, 
-  Star,
-  Calendar,
-  Phone,
-  MapPin,
-} from 'lucide-react-native';
+import { useAuth } from '@/components/AuthProvider';
+import { apiService } from '@/services/api';
+import { Users, Star, Calendar, Phone, MapPin, Clock, CircleCheck as CheckCircle, User, Mail, Target, Award } from 'lucide-react-native';
 
-export default function TrainerScreen() {
+const { width } = Dimensions.get('window');
+
+export default function MyTrainerScreen() {
   const { theme } = useTheme();
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const { user } = useAuth();
+  const [assignedTrainer, setAssignedTrainer] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Mock trainer data
-  const trainers = [
-    {
-      id: '1',
-      name: 'John Smith',
-      specialization: 'Strength Training',
-      experience: '5 years',
-      rating: 4.8,
-      assignedMembers: 15,
-      availability: ['Morning', 'Evening'],
-      phone: '+91 9876543210',
-      location: 'Mumbai',
-    },
-    {
-      id: '2',
-      name: 'Sarah Johnson',
-      specialization: 'Yoga & Pilates',
-      experience: '3 years',
-      rating: 4.9,
-      assignedMembers: 12,
-      availability: ['Morning'],
-      phone: '+91 9876543211',
-      location: 'Delhi',
-    },
-    {
-      id: '3',
-      name: 'Mike Wilson',
-      specialization: 'Cardio & HIIT',
-      experience: '7 years',
-      rating: 4.7,
-      assignedMembers: 18,
-      availability: ['Evening'],
-      phone: '+91 9876543212',
-      location: 'Bangalore',
-    },
-    {
-      id: '4',
-      name: 'Emily Davis',
-      specialization: 'Functional Training',
-      experience: '4 years',
-      rating: 4.8,
-      assignedMembers: 10,
-      availability: ['Morning', 'Evening'],
-      phone: '+91 9876543213',
-      location: 'Chennai',
-    },
-  ];
+  useEffect(() => {
+    loadAssignedTrainer();
+  }, []);
 
-  const filteredTrainers = trainers.filter(trainer =>
-    trainer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    trainer.specialization.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const loadAssignedTrainer = async () => {
+    try {
+      setLoading(true);
+      // Mock assigned trainer data - replace with actual API call
+      // const response = await apiService.getAssignedTrainer(user?.membershipID);
+      
+      const mockTrainer = {
+        id: 'TR001',
+        name: 'Sarah Johnson',
+        trainerId: 'TR001',
+        specialization: 'Strength Training & Yoga',
+        experience: '5 years',
+        rating: 4.9,
+        image: 'https://images.pexels.com/photos/3768916/pexels-photo-3768916.jpeg',
+        bio: 'Certified strength trainer with expertise in powerlifting, bodybuilding, and yoga. Passionate about helping clients achieve their fitness goals.',
+        phone: '+91 9876543210',
+        email: 'sarah.johnson@gym.com',
+        availability: 'Available Today',
+        isAvailable: true,
+        weeklySchedule: {
+          Monday: '6:00 AM - 10:00 AM, 6:00 PM - 9:00 PM',
+          Tuesday: '6:00 AM - 10:00 AM, 6:00 PM - 9:00 PM',
+          Wednesday: '6:00 AM - 10:00 AM, 6:00 PM - 9:00 PM',
+          Thursday: '6:00 AM - 10:00 AM, 6:00 PM - 9:00 PM',
+          Friday: '6:00 AM - 10:00 AM, 6:00 PM - 9:00 PM',
+          Saturday: '7:00 AM - 12:00 PM',
+          Sunday: 'Rest Day'
+        },
+        assignedCustomers: 15,
+        achievements: [
+          'Certified Personal Trainer (ACSM)',
+          'Yoga Alliance Certified (RYT-200)',
+          'Nutrition Specialist',
+          'First Aid & CPR Certified'
+        ],
+        assignedDate: '2024-01-15',
+        nextSession: '2024-02-15 07:00 AM'
+      };
+      
+      setAssignedTrainer(mockTrainer);
+    } catch (error) {
+      console.error('Error loading assigned trainer:', error);
+      Alert.alert('Error', 'Failed to load trainer information');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleContactTrainer = (type: 'phone' | 'email') => {
+    if (!assignedTrainer) return;
+    
+    if (type === 'phone') {
+      Alert.alert(
+        'Contact Trainer',
+        `Call ${assignedTrainer.name}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Call', onPress: () => {
+            // In a real app, this would open the phone dialer
+            Alert.alert('Feature', 'Phone dialer would open here');
+          }}
+        ]
+      );
+    } else {
+      Alert.alert(
+        'Contact Trainer',
+        `Send email to ${assignedTrainer.name}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Email', onPress: () => {
+            // In a real app, this would open the email client
+            Alert.alert('Feature', 'Email client would open here');
+          }}
+        ]
+      );
+    }
+  };
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.background,
+      paddingBottom: 100,
     },
     header: {
-      backgroundColor: theme.surface,
+      backgroundColor: theme.primary,
       paddingTop: 50,
-      paddingBottom: 20,
+      paddingBottom: 30,
       paddingHorizontal: 20,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.border,
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    headerBackground: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      opacity: 0.1,
     },
     headerTitle: {
-      fontSize: 24,
+      fontSize: 28,
       fontWeight: 'bold',
-      color: theme.text,
+      color: 'white',
+      marginBottom: 8,
     },
     headerSubtitle: {
       fontSize: 16,
-      color: theme.textSecondary,
-      marginTop: 4,
+      color: 'rgba(255,255,255,0.9)',
     },
     content: {
       flex: 1,
       padding: 20,
     },
+    noTrainerCard: {
+      backgroundColor: theme.surface,
+      borderRadius: 16,
+      padding: 24,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    noTrainerIcon: {
+      marginBottom: 16,
+    },
+    noTrainerTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    noTrainerText: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    trainerCard: {
+      backgroundColor: theme.surface,
+      borderRadius: 20,
+      padding: 24,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: theme.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 5,
+    },
+    trainerHeader: {
+      flexDirection: 'row',
+      marginBottom: 20,
+    },
+    trainerImage: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      marginRight: 20,
+    },
+    trainerInfo: {
+      flex: 1,
+      justifyContent: 'center',
+    },
+    trainerName: {
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 4,
+    },
+    trainerId: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      marginBottom: 8,
+    },
+    trainerSpecialization: {
+      fontSize: 16,
+      color: theme.primary,
+      fontWeight: '600',
+      marginBottom: 8,
+    },
+    ratingContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    rating: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.text,
+      marginLeft: 4,
+    },
+    availabilityContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.success + '20',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      alignSelf: 'flex-start',
+      marginBottom: 16,
+    },
+    availabilityText: {
+      fontSize: 12,
+      color: theme.success,
+      fontWeight: '600',
+      marginLeft: 4,
+    },
+    unavailableContainer: {
+      backgroundColor: theme.error + '20',
+    },
+    unavailableText: {
+      color: theme.error,
+    },
+    trainerBio: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      lineHeight: 20,
+      marginBottom: 20,
+    },
+    contactSection: {
+      marginBottom: 20,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 12,
+    },
+    contactButtons: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    contactButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.primary,
+      paddingVertical: 12,
+      borderRadius: 12,
+      marginHorizontal: 4,
+    },
+    contactButtonText: {
+      color: 'white',
+      fontSize: 14,
+      fontWeight: '600',
+      marginLeft: 8,
+    },
+    scheduleSection: {
+      marginBottom: 20,
+    },
+    scheduleCard: {
+      backgroundColor: theme.background,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    scheduleRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    scheduleRowLast: {
+      borderBottomWidth: 0,
+    },
+    scheduleDay: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.text,
+      flex: 1,
+    },
+    scheduleTime: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      flex: 2,
+      textAlign: 'right',
+    },
+    restDay: {
+      color: theme.error,
+      fontStyle: 'italic',
+    },
+    statsSection: {
+      marginBottom: 20,
+    },
     statsContainer: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      marginBottom: 20,
     },
     statCard: {
       flex: 1,
-      backgroundColor: theme.surface,
+      backgroundColor: theme.background,
       padding: 16,
       borderRadius: 12,
       marginHorizontal: 4,
@@ -131,341 +340,215 @@ export default function TrainerScreen() {
       color: theme.textSecondary,
       textAlign: 'center',
     },
-    searchContainer: {
-      flexDirection: 'row',
+    achievementsSection: {
       marginBottom: 20,
     },
-    searchInput: {
-      flex: 1,
-      backgroundColor: theme.surface,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderRadius: 12,
-      fontSize: 16,
-      color: theme.text,
-      borderWidth: 1,
-      borderColor: theme.border,
-      marginRight: 12,
-    },
-    searchButton: {
-      backgroundColor: theme.surface,
-      padding: 12,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.border,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    addButton: {
-      backgroundColor: theme.primary,
-      padding: 12,
-      borderRadius: 12,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginLeft: 8,
-    },
-    trainerCard: {
-      backgroundColor: theme.surface,
+    achievementsList: {
+      backgroundColor: theme.background,
       borderRadius: 12,
       padding: 16,
-      marginBottom: 12,
       borderWidth: 1,
       borderColor: theme.border,
     },
-    trainerHeader: {
+    achievementItem: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 12,
     },
-    trainerInfo: {
+    achievementItemLast: {
+      marginBottom: 0,
+    },
+    achievementText: {
+      fontSize: 14,
+      color: theme.text,
+      marginLeft: 12,
       flex: 1,
     },
-    trainerName: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: theme.text,
-    },
-    trainerSpecialization: {
-      fontSize: 14,
-      color: theme.textSecondary,
-      marginTop: 2,
-    },
-    ratingContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    sessionInfo: {
       backgroundColor: theme.primary + '20',
-      paddingHorizontal: 8,
-      paddingVertical: 4,
       borderRadius: 12,
-    },
-    rating: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: theme.primary,
-      marginLeft: 4,
-    },
-    trainerDetails: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginBottom: 12,
-    },
-    detailItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginRight: 16,
-      marginBottom: 8,
-    },
-    detailText: {
-      fontSize: 12,
-      color: theme.textSecondary,
-      marginLeft: 4,
-    },
-    availabilityContainer: {
-      flexDirection: 'row',
-      marginTop: 8,
-    },
-    availabilityBadge: {
-      backgroundColor: theme.primary + '20',
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 8,
-      marginRight: 8,
-    },
-    availabilityText: {
-      fontSize: 12,
-      color: theme.primary,
-      fontWeight: '600',
-    },
-    assignedMembers: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      color: theme.primary,
-      textAlign: 'center',
-    },
-    modal: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    modalContent: {
-      backgroundColor: theme.surface,
-      borderRadius: 16,
-      padding: 20,
-      width: '90%',
-      maxWidth: 400,
-    },
-    modalTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: theme.text,
-      marginBottom: 20,
-      textAlign: 'center',
-    },
-    modalInput: {
-      backgroundColor: theme.background,
-      borderWidth: 1,
-      borderColor: theme.border,
-      borderRadius: 8,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      fontSize: 16,
-      color: theme.text,
-      marginBottom: 16,
-    },
-    modalButtons: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
+      padding: 16,
       marginTop: 20,
     },
-    modalButton: {
-      flex: 1,
-      paddingVertical: 12,
-      borderRadius: 8,
-      alignItems: 'center',
-      marginHorizontal: 8,
-    },
-    cancelButton: {
-      backgroundColor: theme.border,
-    },
-    saveButton: {
-      backgroundColor: theme.primary,
-    },
-    modalButtonText: {
+    sessionTitle: {
       fontSize: 16,
-      fontWeight: '600',
+      fontWeight: 'bold',
+      color: theme.primary,
+      marginBottom: 8,
     },
-    cancelButtonText: {
+    sessionDetails: {
+      fontSize: 14,
       color: theme.text,
     },
-    saveButtonText: {
-      color: 'white',
-    },
   });
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Trainer</Text>
+          <Text style={styles.headerSubtitle}>Loading trainer information...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Trainers</Text>
-        <Text style={styles.headerSubtitle}>Manage gym trainers and assignments</Text>
+        <Image
+          source={{ uri: 'https://images.pexels.com/photos/1552242/pexels-photo-1552242.jpeg' }}
+          style={styles.headerBackground}
+          resizeMode="cover"
+        />
+        <Text style={styles.headerTitle}>My Trainer</Text>
+        <Text style={styles.headerSubtitle}>Your assigned fitness coach</Text>
       </View>
 
       {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{trainers.length}</Text>
-            <Text style={styles.statLabel}>Total Trainers</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>
-              {trainers.reduce((sum, t) => sum + t.assignedMembers, 0)}
+        {!assignedTrainer ? (
+          <View style={styles.noTrainerCard}>
+            <Users size={48} color={theme.textSecondary} style={styles.noTrainerIcon} />
+            <Text style={styles.noTrainerTitle}>No Trainer Assigned</Text>
+            <Text style={styles.noTrainerText}>
+              You don't have a trainer assigned yet. Please contact the gym administration to get a trainer assigned to your membership.
             </Text>
-            <Text style={styles.statLabel}>Assigned Members</Text>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>
-              {(trainers.reduce((sum, t) => sum + t.rating, 0) / trainers.length).toFixed(1)}
-            </Text>
-            <Text style={styles.statLabel}>Average Rating</Text>
-          </View>
-        </View>
-
-        {/* Search and Add */}
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search trainers..."
-            placeholderTextColor={theme.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          <TouchableOpacity style={styles.searchButton}>
-            <Search size={20} color={theme.text} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.addButton}
-            onPress={() => setShowAddModal(true)}
-          >
-            <Plus size={20} color="white" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Trainers List */}
-        {filteredTrainers.map((trainer) => (
-          <View key={trainer.id} style={styles.trainerCard}>
+        ) : (
+          <View style={styles.trainerCard}>
+            {/* Trainer Header */}
             <View style={styles.trainerHeader}>
+              <Image
+                source={{ uri: assignedTrainer.image }}
+                style={styles.trainerImage}
+                resizeMode="cover"
+              />
               <View style={styles.trainerInfo}>
-                <Text style={styles.trainerName}>{trainer.name}</Text>
-                <Text style={styles.trainerSpecialization}>{trainer.specialization}</Text>
-              </View>
-              <View style={styles.ratingContainer}>
-                <Star size={14} color={theme.primary} fill={theme.primary} />
-                <Text style={styles.rating}>{trainer.rating}</Text>
-              </View>
-            </View>
-
-            <View style={styles.trainerDetails}>
-              <View style={styles.detailItem}>
-                <Calendar size={14} color={theme.textSecondary} />
-                <Text style={styles.detailText}>{trainer.experience}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Phone size={14} color={theme.textSecondary} />
-                <Text style={styles.detailText}>{trainer.phone}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <MapPin size={14} color={theme.textSecondary} />
-                <Text style={styles.detailText}>{trainer.location}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Users size={14} color={theme.textSecondary} />
-                <Text style={styles.detailText}>{trainer.assignedMembers} members</Text>
-              </View>
-            </View>
-
-            <View style={styles.availabilityContainer}>
-              {trainer.availability.map((slot, index) => (
-                <View key={index} style={styles.availabilityBadge}>
-                  <Text style={styles.availabilityText}>{slot}</Text>
+                <Text style={styles.trainerName}>{assignedTrainer.name}</Text>
+                <Text style={styles.trainerId}>ID: {assignedTrainer.trainerId}</Text>
+                <Text style={styles.trainerSpecialization}>{assignedTrainer.specialization}</Text>
+                <View style={styles.ratingContainer}>
+                  <Star size={16} color="#FFD700" fill="#FFD700" />
+                  <Text style={styles.rating}>{assignedTrainer.rating}</Text>
                 </View>
-              ))}
+              </View>
             </View>
+
+            {/* Availability */}
+            <View style={[
+              styles.availabilityContainer,
+              !assignedTrainer.isAvailable && styles.unavailableContainer
+            ]}>
+              <CheckCircle size={12} color={assignedTrainer.isAvailable ? theme.success : theme.error} />
+              <Text style={[
+                styles.availabilityText,
+                !assignedTrainer.isAvailable && styles.unavailableText
+              ]}>
+                {assignedTrainer.availability}
+              </Text>
+            </View>
+
+            {/* Bio */}
+            <Text style={styles.trainerBio}>{assignedTrainer.bio}</Text>
+
+            {/* Contact Section */}
+            <View style={styles.contactSection}>
+              <Text style={styles.sectionTitle}>Contact Trainer</Text>
+              <View style={styles.contactButtons}>
+                <TouchableOpacity
+                  style={styles.contactButton}
+                  onPress={() => handleContactTrainer('phone')}
+                >
+                  <Phone size={16} color="white" />
+                  <Text style={styles.contactButtonText}>Call</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.contactButton}
+                  onPress={() => handleContactTrainer('email')}
+                >
+                  <Mail size={16} color="white" />
+                  <Text style={styles.contactButtonText}>Email</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Stats */}
+            <View style={styles.statsSection}>
+              <Text style={styles.sectionTitle}>Trainer Stats</Text>
+              <View style={styles.statsContainer}>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>{assignedTrainer.experience}</Text>
+                  <Text style={styles.statLabel}>Experience</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>{assignedTrainer.assignedCustomers}</Text>
+                  <Text style={styles.statLabel}>Assigned Customers</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>{assignedTrainer.rating}</Text>
+                  <Text style={styles.statLabel}>Rating</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Weekly Schedule */}
+            <View style={styles.scheduleSection}>
+              <Text style={styles.sectionTitle}>Weekly Schedule</Text>
+              <View style={styles.scheduleCard}>
+                {Object.entries(assignedTrainer.weeklySchedule).map(([day, time], index, array) => (
+                  <View 
+                    key={day} 
+                    style={[
+                      styles.scheduleRow,
+                      index === array.length - 1 && styles.scheduleRowLast
+                    ]}
+                  >
+                    <Text style={styles.scheduleDay}>{day}</Text>
+                    <Text style={[
+                      styles.scheduleTime,
+                      time === 'Rest Day' && styles.restDay
+                    ]}>
+                      {time}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Achievements */}
+            <View style={styles.achievementsSection}>
+              <Text style={styles.sectionTitle}>Certifications & Achievements</Text>
+              <View style={styles.achievementsList}>
+                {assignedTrainer.achievements.map((achievement, index) => (
+                  <View 
+                    key={index}
+                    style={[
+                      styles.achievementItem,
+                      index === assignedTrainer.achievements.length - 1 && styles.achievementItemLast
+                    ]}
+                  >
+                    <Award size={16} color={theme.primary} />
+                    <Text style={styles.achievementText}>{achievement}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Next Session Info */}
+            {assignedTrainer.nextSession && (
+              <View style={styles.sessionInfo}>
+                <Text style={styles.sessionTitle}>Next Session</Text>
+                <Text style={styles.sessionDetails}>
+                  Scheduled for {assignedTrainer.nextSession}
+                </Text>
+              </View>
+            )}
           </View>
-        ))}
+        )}
       </ScrollView>
-
-      {/* Add Trainer Modal */}
-      <Modal
-        visible={showAddModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowAddModal(false)}
-      >
-        <View style={styles.modal}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add New Trainer</Text>
-            
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Trainer Name"
-              placeholderTextColor={theme.textSecondary}
-            />
-            
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Specialization"
-              placeholderTextColor={theme.textSecondary}
-            />
-            
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Experience (years)"
-              placeholderTextColor={theme.textSecondary}
-              keyboardType="numeric"
-            />
-            
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Phone Number"
-              placeholderTextColor={theme.textSecondary}
-              keyboardType="phone-pad"
-            />
-            
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Location"
-              placeholderTextColor={theme.textSecondary}
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowAddModal(false)}
-              >
-                <Text style={[styles.modalButtonText, styles.cancelButtonText]}>
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={() => {
-                  // Handle save trainer
-                  setShowAddModal(false);
-                }}
-              >
-                <Text style={[styles.modalButtonText, styles.saveButtonText]}>
-                  Save
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
