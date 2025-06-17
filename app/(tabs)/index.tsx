@@ -12,22 +12,8 @@ import {
 } from 'react-native';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { 
-  Menu, 
-  Bell, 
-  Sun, 
-  Moon, 
-  LogOut, 
-  User, 
-  ChevronDown,
-  Activity,
-  Users,
-  CreditCard,
-  TrendingUp,
-  Dumbbell,
-  Calendar,
-  Target,
-} from 'lucide-react-native';
+import { apiService } from '@/services/api';
+import { Menu, Bell, Sun, Moon, LogOut, User, ChevronDown, Activity, Users, CreditCard, TrendingUp, Dumbbell, Calendar, Target, Clock, CircleCheck as CheckCircle, Circle as XCircle, MapPin, Phone, Mail, UserCheck, UserX, Shield, Heart, Chrome as Home } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
@@ -37,7 +23,81 @@ export default function DashboardScreen() {
   const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNavMenu, setShowNavMenu] = useState(false);
+  const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [membershipDetails, setMembershipDetails] = useState(null);
+  const [personalInfo, setPersonalInfo] = useState(null);
+  const [checkInTime, setCheckInTime] = useState(null);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      // Load membership details and personal info from backend
+      // For now using mock data - replace with actual API calls
+      setMembershipDetails({
+        status: 'Active',
+        membershipID: user?.membershipID || 'GYM001',
+        plan: 'Annual Premium Plan',
+        paymentStatus: 'Completed',
+        expiryDate: '2024-12-31',
+        joinDate: '2024-01-01'
+      });
+
+      setPersonalInfo({
+        age: 25,
+        gender: 'Male',
+        phoneNumber: user?.phone_number || '+91 9876543210',
+        address: '123 Fitness Street, Gym City, State 123456',
+        emergencyContact: '+91 9876543211',
+        healthCondition: 'Normal'
+      });
+
+      // Check if user is currently checked in
+      // This should come from backend
+      setIsCheckedIn(false);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckIn = async () => {
+    try {
+      setLoading(true);
+      // API call to check in
+      // await apiService.checkIn(user?.membershipID);
+      
+      setIsCheckedIn(true);
+      setCheckInTime(new Date());
+      Alert.alert('Success', 'Checked in successfully!');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to check in. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckOut = async () => {
+    try {
+      setLoading(true);
+      // API call to check out
+      // await apiService.checkOut(user?.membershipID);
+      
+      setIsCheckedIn(false);
+      setCheckInTime(null);
+      Alert.alert('Success', 'Checked out successfully!');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to check out. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -60,24 +120,22 @@ export default function DashboardScreen() {
 
   const navigationItems = [
     { name: 'Dashboard', route: '/(tabs)', icon: Activity },
-    { name: 'Payments', route: '/(tabs)/payments', icon: CreditCard },
-    { name: 'Trainer', route: '/(tabs)/trainer', icon: Users },
-    { name: 'Membership', route: '/(tabs)/membership', icon: TrendingUp },
-    { name: 'Settings', route: '/(tabs)/settings', icon: User },
-  ];
-
-  const stats = [
-    { title: 'Active Members', value: '1,234', color: theme.primary, icon: Users },
-    { title: 'Monthly Revenue', value: '₹45,000', color: '#F59E0B', icon: TrendingUp },
-    { title: 'Trainers', value: '12', color: '#EF4444', icon: Users },
-    { title: 'Equipment', value: '85', color: '#8B5CF6', icon: Dumbbell },
+    { name: 'Payment History', route: '/(tabs)/payments', icon: CreditCard },
+    { name: 'My Trainer', route: '/(tabs)/trainer', icon: Users },
+    { name: 'Membership Plans', route: '/(tabs)/membership', icon: TrendingUp },
+    { name: 'Profile Settings', route: '/(tabs)/settings', icon: User },
   ];
 
   const quickActions = [
-    { title: 'View Plans', icon: TrendingUp, route: '/(tabs)/membership', color: theme.primary },
-    { title: 'Payments', icon: CreditCard, route: '/(tabs)/payments', color: '#F59E0B' },
-    { title: 'Trainers', icon: Users, route: '/(tabs)/trainer', color: '#EF4444' },
-    { title: 'Profile', icon: User, route: '/(tabs)/settings', color: '#8B5CF6' },
+    { 
+      title: isCheckedIn ? 'Check Out' : 'Check In', 
+      icon: isCheckedIn ? UserX : UserCheck, 
+      action: isCheckedIn ? handleCheckOut : handleCheckIn,
+      color: isCheckedIn ? '#EF4444' : '#22C55E'
+    },
+    { title: 'Payment History', icon: CreditCard, route: '/(tabs)/payments', color: '#F59E0B' },
+    { title: 'My Trainer', icon: Users, route: '/(tabs)/trainer', color: '#8B5CF6' },
+    { title: 'Profile Settings', icon: User, route: '/(tabs)/settings', color: '#06B6D4' },
   ];
 
   const styles = StyleSheet.create({
@@ -155,6 +213,7 @@ export default function DashboardScreen() {
     },
     content: {
       flex: 1,
+      paddingBottom: 100,
     },
     heroSection: {
       backgroundColor: theme.primary,
@@ -186,35 +245,54 @@ export default function DashboardScreen() {
       backgroundColor: 'rgba(255,255,255,0.15)',
       borderRadius: 16,
       padding: 16,
+      marginBottom: 16,
+    },
+    membershipRow: {
       flexDirection: 'row',
-      alignItems: 'center',
       justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8,
     },
-    membershipInfo: {
-      flex: 1,
-    },
-    membershipTitle: {
+    membershipLabel: {
       fontSize: 14,
       color: 'rgba(255,255,255,0.8)',
-      marginBottom: 4,
     },
-    membershipId: {
-      fontSize: 18,
+    membershipValue: {
+      fontSize: 16,
       fontWeight: 'bold',
       color: 'white',
     },
-    membershipStatus: {
-      backgroundColor: theme.success,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
+    checkInSection: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 16,
+    },
+    checkInButton: {
+      flex: 1,
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      paddingVertical: 12,
       borderRadius: 12,
+      alignItems: 'center',
+      marginHorizontal: 4,
+      flexDirection: 'row',
+      justifyContent: 'center',
     },
-    membershipStatusText: {
+    checkInButtonActive: {
+      backgroundColor: '#EF4444',
+    },
+    checkInButtonText: {
       color: 'white',
-      fontSize: 12,
+      fontSize: 14,
       fontWeight: '600',
+      marginLeft: 8,
     },
-    statsSection: {
+    checkInTime: {
+      fontSize: 12,
+      color: 'rgba(255,255,255,0.8)',
+      textAlign: 'center',
+      marginTop: 8,
+    },
+    section: {
       padding: 20,
     },
     sectionTitle: {
@@ -223,33 +301,66 @@ export default function DashboardScreen() {
       color: theme.text,
       marginBottom: 16,
     },
-    statsGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-    },
-    statCard: {
-      width: (width - 60) / 2,
+    membershipDetailsCard: {
       backgroundColor: theme.surface,
-      padding: 20,
       borderRadius: 16,
-      marginBottom: 16,
+      padding: 20,
+      marginBottom: 20,
       borderWidth: 1,
       borderColor: theme.border,
-      alignItems: 'center',
     },
-    statIcon: {
+    detailRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
       marginBottom: 12,
     },
-    statValue: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      marginBottom: 4,
-    },
-    statTitle: {
+    detailLabel: {
       fontSize: 14,
       color: theme.textSecondary,
-      textAlign: 'center',
+      flex: 1,
+    },
+    detailValue: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.text,
+      flex: 2,
+      textAlign: 'right',
+    },
+    statusActive: {
+      color: theme.success,
+    },
+    statusInactive: {
+      color: theme.error,
+    },
+    personalInfoCard: {
+      backgroundColor: theme.surface,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    infoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    infoIcon: {
+      marginRight: 12,
+    },
+    infoContent: {
+      flex: 1,
+    },
+    infoLabel: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      marginBottom: 4,
+    },
+    infoValue: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.text,
     },
     quickActionsSection: {
       paddingHorizontal: 20,
@@ -348,8 +459,8 @@ export default function DashboardScreen() {
           <View style={styles.logoContainer}>
             <Dumbbell size={24} color={theme.primary} style={styles.logoIcon} />
             <View>
-              <Text style={styles.logoText}>Apiathelete</Text>
-              <Text style={styles.subtitle}>Fitness Management</Text>
+              <Text style={styles.logoText}>APIthlete</Text>
+              <Text style={styles.subtitle}>Powered By Webgeon Results</Text>
             </View>
           </View>
         </View>
@@ -389,27 +500,121 @@ export default function DashboardScreen() {
           </Text>
           
           <View style={styles.membershipCard}>
-            <View style={styles.membershipInfo}>
-              <Text style={styles.membershipTitle}>Membership ID</Text>
-              <Text style={styles.membershipId}>{user?.membershipID || 'N/A'}</Text>
+            <View style={styles.membershipRow}>
+              <Text style={styles.membershipLabel}>Membership ID</Text>
+              <Text style={styles.membershipValue}>{user?.membershipID || 'N/A'}</Text>
             </View>
-            <View style={styles.membershipStatus}>
-              <Text style={styles.membershipStatusText}>Active</Text>
+            <View style={styles.membershipRow}>
+              <Text style={styles.membershipLabel}>Email</Text>
+              <Text style={styles.membershipValue}>{user?.email || 'N/A'}</Text>
+            </View>
+          </View>
+
+          {/* Check In/Out Section */}
+          <View style={styles.checkInSection}>
+            <TouchableOpacity
+              style={[styles.checkInButton, isCheckedIn && styles.checkInButtonActive]}
+              onPress={isCheckedIn ? handleCheckOut : handleCheckIn}
+              disabled={loading}
+            >
+              {isCheckedIn ? (
+                <UserX size={20} color="white" />
+              ) : (
+                <UserCheck size={20} color="white" />
+              )}
+              <Text style={styles.checkInButtonText}>
+                {loading ? 'Processing...' : (isCheckedIn ? 'Check Out' : 'Check In')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          
+          {isCheckedIn && checkInTime && (
+            <Text style={styles.checkInTime}>
+              Checked in at {checkInTime.toLocaleTimeString()}
+            </Text>
+          )}
+        </View>
+
+        {/* Membership Details */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Membership Details</Text>
+          <View style={styles.membershipDetailsCard}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Status</Text>
+              <Text style={[
+                styles.detailValue, 
+                membershipDetails?.status === 'Active' ? styles.statusActive : styles.statusInactive
+              ]}>
+                {membershipDetails?.status || 'N/A'}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Membership ID</Text>
+              <Text style={styles.detailValue}>{membershipDetails?.membershipID || 'N/A'}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Plan</Text>
+              <Text style={styles.detailValue}>{membershipDetails?.plan || 'N/A'}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Payment Status</Text>
+              <Text style={[
+                styles.detailValue,
+                membershipDetails?.paymentStatus === 'Completed' ? styles.statusActive : styles.statusInactive
+              ]}>
+                {membershipDetails?.paymentStatus || 'N/A'}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Expiry Date</Text>
+              <Text style={styles.detailValue}>{membershipDetails?.expiryDate || 'N/A'}</Text>
             </View>
           </View>
         </View>
 
-        {/* Stats Section */}
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>Gym Overview</Text>
-          <View style={styles.statsGrid}>
-            {stats.map((stat, index) => (
-              <View key={index} style={styles.statCard}>
-                <stat.icon size={32} color={stat.color} style={styles.statIcon} />
-                <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
-                <Text style={styles.statTitle}>{stat.title}</Text>
+        {/* Personal Information */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Personal Information</Text>
+          <View style={styles.personalInfoCard}>
+            <View style={styles.infoRow}>
+              <Calendar size={20} color={theme.primary} style={styles.infoIcon} />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Age</Text>
+                <Text style={styles.infoValue}>{personalInfo?.age || 'N/A'} years</Text>
               </View>
-            ))}
+            </View>
+            
+            <View style={styles.infoRow}>
+              <User size={20} color={theme.primary} style={styles.infoIcon} />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Gender</Text>
+                <Text style={styles.infoValue}>{personalInfo?.gender || 'N/A'}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.infoRow}>
+              <Phone size={20} color={theme.primary} style={styles.infoIcon} />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Phone Number</Text>
+                <Text style={styles.infoValue}>{personalInfo?.phoneNumber || 'N/A'}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.infoRow}>
+              <MapPin size={20} color={theme.primary} style={styles.infoIcon} />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Address</Text>
+                <Text style={styles.infoValue}>{personalInfo?.address || 'N/A'}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.infoRow}>
+              <Heart size={20} color={theme.primary} style={styles.infoIcon} />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Health Condition</Text>
+                <Text style={styles.infoValue}>{personalInfo?.healthCondition || 'N/A'}</Text>
+              </View>
+            </View>
           </View>
         </View>
 
@@ -421,7 +626,7 @@ export default function DashboardScreen() {
               <TouchableOpacity 
                 key={index}
                 style={styles.actionCard}
-                onPress={() => router.push(action.route as any)}
+                onPress={() => action.route ? router.push(action.route as any) : action.action?.()}
               >
                 <action.icon size={32} color={action.color} style={styles.actionIcon} />
                 <Text style={styles.actionText}>{action.title}</Text>
