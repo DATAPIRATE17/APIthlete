@@ -14,7 +14,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/components/ThemeProvider';
 import { apiService } from '@/services/api';
-import { User, Mail, Phone, MapPin, Calendar, Heart, Users, Clock, ArrowLeft, CircleCheck as CheckCircle } from 'lucide-react-native';
+import { User, Mail, Phone, MapPin, Calendar, Heart, Users, Clock, ArrowLeft, CircleCheck as CheckCircle, Upload, FileText } from 'lucide-react-native';
+import * as DocumentPicker from 'expo-document-picker';
 
 const { width } = Dimensions.get('window');
 
@@ -23,16 +24,16 @@ interface FormData {
   email: string;
   phone_number: string;
   age: string;
+  date_of_birth: string;
   gender: string;
-  health_condition: string;
+  emergency_contact: string;
   address: string;
   pincode: string;
-  emergency_contact: string;
-  trainer_name: string;
-  availability: string;
+  preferred_time_slot: string;
   identity_type: string;
   identity_number: string;
-  date_of_birth: string;
+  health_condition: string;
+  identity_document?: any;
 }
 
 export default function RegisterScreen() {
@@ -42,20 +43,20 @@ export default function RegisterScreen() {
     email: '',
     phone_number: phoneNumber || '',
     age: '',
+    date_of_birth: '',
     gender: '',
-    health_condition: '',
+    emergency_contact: '',
     address: '',
     pincode: '',
-    emergency_contact: '',
-    trainer_name: '',
-    availability: '',
+    preferred_time_slot: '',
     identity_type: '',
     identity_number: '',
-    date_of_birth: '',
+    health_condition: 'Normal',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentStep, setCurrentStep] = useState(1);
+  const [selectedDocument, setSelectedDocument] = useState(null);
   const router = useRouter();
   const { theme } = useTheme();
 
@@ -68,11 +69,11 @@ export default function RegisterScreen() {
       case 1:
         return !!(formData.full_name && formData.email && formData.phone_number);
       case 2:
-        return !!(formData.age && formData.gender && formData.address && formData.pincode);
+        return !!(formData.age && formData.date_of_birth && formData.gender && formData.emergency_contact);
       case 3:
-        return !!(formData.emergency_contact && formData.health_condition && formData.availability);
+        return !!(formData.address && formData.pincode && formData.preferred_time_slot);
       case 4:
-        return !!(formData.identity_type && formData.identity_number);
+        return !!(formData.identity_type && formData.identity_number && formData.health_condition);
       default:
         return true;
     }
@@ -92,6 +93,31 @@ export default function RegisterScreen() {
     setError('');
   };
 
+  const handleDocumentPicker = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'application/pdf'],
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const file = result.assets[0];
+        
+        // Check file size (5MB limit)
+        if (file.size && file.size > 5 * 1024 * 1024) {
+          Alert.alert('Error', 'File size must be less than 5MB');
+          return;
+        }
+
+        setSelectedDocument(file);
+        setFormData(prev => ({ ...prev, identity_document: file }));
+      }
+    } catch (error) {
+      console.error('Error picking document:', error);
+      Alert.alert('Error', 'Failed to pick document');
+    }
+  };
+
   const handleRegister = async () => {
     if (!validateStep(4)) {
       setError('Please fill in all required fields');
@@ -105,17 +131,26 @@ export default function RegisterScreen() {
       const formDataToSend = new FormData();
       
       Object.entries(formData).forEach(([key, value]) => {
-        if (value) {
+        if (value && key !== 'identity_document') {
           formDataToSend.append(key, value);
         }
       });
+
+      // Add identity document if selected
+      if (selectedDocument) {
+        formDataToSend.append('identity_document', {
+          uri: selectedDocument.uri,
+          type: selectedDocument.mimeType || 'application/octet-stream',
+          name: selectedDocument.name || 'identity_document',
+        } as any);
+      }
 
       const response = await apiService.registerUser(formDataToSend);
       
       if (response.token) {
         Alert.alert(
           'Registration Successful!',
-          `Welcome ${formData.full_name}! Your membership ID is ${response.user?.membershipID}`,
+          `Welcome ${formData.full_name}! Your membership ID is ${response.user?.membershipID}. Please login with your phone number.`,
           [
             {
               text: 'Continue to Login',
@@ -208,7 +243,6 @@ export default function RegisterScreen() {
             value={formData.phone_number}
             onChangeText={(text) => updateField('phone_number', text)}
             keyboardType="phone-pad"
-            editable={false}
           />
         </View>
       </View>
@@ -217,7 +251,7 @@ export default function RegisterScreen() {
 
   const renderStep2 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Additional Details</Text>
+      <Text style={styles.stepTitle}>Personal Details</Text>
       <Text style={styles.stepSubtitle}>Tell us more about yourself</Text>
 
       <View style={styles.inputContainer}>
@@ -231,6 +265,20 @@ export default function RegisterScreen() {
             value={formData.age}
             onChangeText={(text) => updateField('age', text)}
             keyboardType="numeric"
+          />
+        </View>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Date of Birth *</Text>
+        <View style={styles.inputWrapper}>
+          <Calendar size={20} color={theme.textSecondary} style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={theme.textSecondary}
+            value={formData.date_of_birth}
+            onChangeText={(text) => updateField('date_of_birth', text)}
           />
         </View>
       </View>
@@ -261,6 +309,28 @@ export default function RegisterScreen() {
       </View>
 
       <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Emergency Contact *</Text>
+        <View style={styles.inputWrapper}>
+          <Phone size={20} color={theme.textSecondary} style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Emergency contact number"
+            placeholderTextColor={theme.textSecondary}
+            value={formData.emergency_contact}
+            onChangeText={(text) => updateField('emergency_contact', text)}
+            keyboardType="phone-pad"
+          />
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderStep3 = () => (
+    <View style={styles.stepContent}>
+      <Text style={styles.stepTitle}>Contact & Preferences</Text>
+      <Text style={styles.stepSubtitle}>Your address and gym preferences</Text>
+
+      <View style={styles.inputContainer}>
         <Text style={styles.inputLabel}>Address *</Text>
         <View style={styles.inputWrapper}>
           <MapPin size={20} color={theme.textSecondary} style={styles.inputIcon} />
@@ -289,60 +359,24 @@ export default function RegisterScreen() {
           />
         </View>
       </View>
-    </View>
-  );
-
-  const renderStep3 = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Health & Training</Text>
-      <Text style={styles.stepSubtitle}>Help us customize your experience</Text>
 
       <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Emergency Contact *</Text>
-        <View style={styles.inputWrapper}>
-          <Phone size={20} color={theme.textSecondary} style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Emergency contact number"
-            placeholderTextColor={theme.textSecondary}
-            value={formData.emergency_contact}
-            onChangeText={(text) => updateField('emergency_contact', text)}
-            keyboardType="phone-pad"
-          />
-        </View>
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Health Condition *</Text>
-        <View style={styles.inputWrapper}>
-          <Heart size={20} color={theme.textSecondary} style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Any health conditions or allergies"
-            placeholderTextColor={theme.textSecondary}
-            value={formData.health_condition}
-            onChangeText={(text) => updateField('health_condition', text)}
-          />
-        </View>
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Preferred Training Time *</Text>
-        <View style={styles.availabilityContainer}>
+        <Text style={styles.inputLabel}>Preferred Time Slot *</Text>
+        <View style={styles.timeSlotContainer}>
           {['Morning', 'Evening'].map((time) => (
             <TouchableOpacity
               key={time}
               style={[
-                styles.availabilityButton,
-                formData.availability === time && styles.availabilityButtonActive,
+                styles.timeSlotButton,
+                formData.preferred_time_slot === time && styles.timeSlotButtonActive,
               ]}
-              onPress={() => updateField('availability', time)}
+              onPress={() => updateField('preferred_time_slot', time)}
             >
-              <Clock size={16} color={formData.availability === time ? 'white' : theme.textSecondary} />
+              <Clock size={16} color={formData.preferred_time_slot === time ? 'white' : theme.textSecondary} />
               <Text
                 style={[
-                  styles.availabilityButtonText,
-                  formData.availability === time && styles.availabilityButtonTextActive,
+                  styles.timeSlotButtonText,
+                  formData.preferred_time_slot === time && styles.timeSlotButtonTextActive,
                 ]}
               >
                 {time}
@@ -351,32 +385,18 @@ export default function RegisterScreen() {
           ))}
         </View>
       </View>
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Preferred Trainer (Optional)</Text>
-        <View style={styles.inputWrapper}>
-          <Users size={20} color={theme.textSecondary} style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Enter trainer name (optional)"
-            placeholderTextColor={theme.textSecondary}
-            value={formData.trainer_name}
-            onChangeText={(text) => updateField('trainer_name', text)}
-          />
-        </View>
-      </View>
     </View>
   );
 
   const renderStep4 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Identity Verification</Text>
+      <Text style={styles.stepTitle}>Identity & Health</Text>
       <Text style={styles.stepSubtitle}>Final step to complete your registration</Text>
 
       <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Identity Type *</Text>
+        <Text style={styles.inputLabel}>Identity Card Type *</Text>
         <View style={styles.identityTypeContainer}>
-          {['Aadhar Card', 'PAN Card', 'Driving License', 'Passport'].map((type) => (
+          {['Aadhar Card', 'PAN Card', 'Passport', 'Driving License'].map((type) => (
             <TouchableOpacity
               key={type}
               style={[
@@ -413,17 +433,49 @@ export default function RegisterScreen() {
       </View>
 
       <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Date of Birth (Optional)</Text>
-        <View style={styles.inputWrapper}>
-          <Calendar size={20} color={theme.textSecondary} style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={theme.textSecondary}
-            value={formData.date_of_birth}
-            onChangeText={(text) => updateField('date_of_birth', text)}
-          />
+        <Text style={styles.inputLabel}>Health Condition *</Text>
+        <View style={styles.healthContainer}>
+          {['Normal', 'Not Normal'].map((condition) => (
+            <TouchableOpacity
+              key={condition}
+              style={[
+                styles.healthButton,
+                formData.health_condition === condition && styles.healthButtonActive,
+              ]}
+              onPress={() => updateField('health_condition', condition)}
+            >
+              <Heart size={16} color={formData.health_condition === condition ? 'white' : theme.textSecondary} />
+              <Text
+                style={[
+                  styles.healthButtonText,
+                  formData.health_condition === condition && styles.healthButtonTextActive,
+                ]}
+              >
+                {condition}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Upload Identity Document</Text>
+        <Text style={styles.inputSubLabel}>Images or PDF files, max 5MB</Text>
+        <TouchableOpacity
+          style={styles.documentButton}
+          onPress={handleDocumentPicker}
+        >
+          <Upload size={20} color={theme.primary} />
+          <Text style={styles.documentButtonText}>
+            {selectedDocument ? selectedDocument.name : 'Choose File'}
+          </Text>
+        </TouchableOpacity>
+        {selectedDocument && (
+          <View style={styles.selectedFile}>
+            <FileText size={16} color={theme.success} />
+            <Text style={styles.selectedFileText}>{selectedDocument.name}</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -522,6 +574,11 @@ export default function RegisterScreen() {
       color: theme.text,
       marginBottom: 8,
     },
+    inputSubLabel: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      marginBottom: 8,
+    },
     inputWrapper: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -566,11 +623,11 @@ export default function RegisterScreen() {
     genderButtonTextActive: {
       color: 'white',
     },
-    availabilityContainer: {
+    timeSlotContainer: {
       flexDirection: 'row',
       justifyContent: 'space-between',
     },
-    availabilityButton: {
+    timeSlotButton: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
@@ -583,16 +640,16 @@ export default function RegisterScreen() {
       backgroundColor: theme.surface,
       marginHorizontal: 4,
     },
-    availabilityButtonActive: {
+    timeSlotButtonActive: {
       backgroundColor: theme.primary,
       borderColor: theme.primary,
     },
-    availabilityButtonText: {
+    timeSlotButtonText: {
       fontSize: 16,
       color: theme.text,
       marginLeft: 8,
     },
-    availabilityButtonTextActive: {
+    timeSlotButtonTextActive: {
       color: 'white',
     },
     identityTypeContainer: {
@@ -622,6 +679,67 @@ export default function RegisterScreen() {
     },
     identityTypeButtonTextActive: {
       color: 'white',
+    },
+    healthContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    healthButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.surface,
+      marginHorizontal: 4,
+    },
+    healthButtonActive: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    healthButtonText: {
+      fontSize: 16,
+      color: theme.text,
+      marginLeft: 8,
+    },
+    healthButtonTextActive: {
+      color: 'white',
+    },
+    documentButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.surface,
+      borderWidth: 2,
+      borderColor: theme.border,
+      borderStyle: 'dashed',
+      borderRadius: 12,
+      paddingVertical: 20,
+      paddingHorizontal: 16,
+    },
+    documentButtonText: {
+      fontSize: 16,
+      color: theme.primary,
+      marginLeft: 8,
+      fontWeight: '600',
+    },
+    selectedFile: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+      padding: 8,
+      backgroundColor: theme.success + '20',
+      borderRadius: 8,
+    },
+    selectedFileText: {
+      fontSize: 14,
+      color: theme.success,
+      marginLeft: 8,
+      fontWeight: '600',
     },
     errorContainer: {
       backgroundColor: theme.error + '20',
@@ -673,6 +791,23 @@ export default function RegisterScreen() {
     },
     backButtonText: {
       color: theme.text,
+    },
+    termsText: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      textAlign: 'center',
+      marginTop: 16,
+      lineHeight: 18,
+    },
+    loginText: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      textAlign: 'center',
+      marginTop: 20,
+    },
+    loginLink: {
+      color: theme.primary,
+      fontWeight: '600',
     },
   });
 
@@ -735,6 +870,24 @@ export default function RegisterScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {currentStep === 4 && (
+          <>
+            <Text style={styles.termsText}>
+              By registering, you agree to our Terms & Privacy Policy.
+            </Text>
+            
+            <Text style={styles.loginText}>
+              Already have an account?{' '}
+              <Text 
+                style={styles.loginLink}
+                onPress={() => router.push('/login')}
+              >
+                Login through OTP-Phone Number
+              </Text>
+            </Text>
+          </>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
