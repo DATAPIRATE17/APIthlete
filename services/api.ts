@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://api.apithlete.webgeon.com';
+const API_BASE_URL = 'https://api.apithlete.webgeon.com';
 
 export interface SendOTPRequest {
   phone: string;
@@ -52,6 +52,76 @@ export interface UpdateProfileRequest {
   emergency_contact?: string;
 }
 
+export interface CheckInOutRequest {
+  membershipID: string;
+  action: 'checkin' | 'checkout';
+}
+
+export interface MembershipDetails {
+  status: string;
+  membershipID: string;
+  plan: string;
+  paymentStatus: string;
+  expiryDate: string;
+  joinDate: string;
+}
+
+export interface PersonalInfo {
+  age: number;
+  gender: string;
+  phoneNumber: string;
+  address: string;
+  emergencyContact: string;
+  healthCondition: string;
+}
+
+export interface PaymentHistory {
+  id: string;
+  fullName: string;
+  email: string;
+  amount: string;
+  plan: string;
+  paymentDate: string;
+  renewalDate: string;
+  status: string;
+  transactionId: string;
+  invoiceNumber: string;
+}
+
+export interface TrainerInfo {
+  id: string;
+  name: string;
+  trainerId: string;
+  specialization: string;
+  experience: string;
+  rating: number;
+  image: string;
+  bio: string;
+  phone: string;
+  email: string;
+  availability: string;
+  isAvailable: boolean;
+  weeklySchedule: Record<string, string>;
+  assignedCustomers: number;
+  achievements: string[];
+  assignedDate: string;
+  nextSession?: string;
+}
+
+export interface MembershipPlan {
+  id: string;
+  name: string;
+  price: string;
+  originalPrice?: string;
+  duration: string;
+  icon: any;
+  color: string;
+  popular: boolean;
+  savings?: string;
+  features: string[];
+  perks?: string[];
+}
+
 class ApiService {
   private baseURL = API_BASE_URL;
   private token: string | null = null;
@@ -87,7 +157,7 @@ class ApiService {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error('API Error:', errorData);
-      throw new Error(errorData.error || `HTTP ${response.status}`);
+      throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
     }
 
     return response.json();
@@ -95,14 +165,14 @@ class ApiService {
 
   // OTP Authentication
   async sendOTP(data: SendOTPRequest): Promise<{ message: string; sessionId: string }> {
-    return this.request<{ message: string; sessionId: string }>('/api/otp/send', {
+    return this.request<{ message: string; sessionId: string }>('/api/otp/send-otp', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async verifyOTP(data: VerifyOTPRequest): Promise<LoginResponse> {
-    return this.request<LoginResponse>('/api/otp/verify', {
+    return this.request<LoginResponse>('/api/otp/verify-otp', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -126,45 +196,105 @@ class ApiService {
     );
   }
 
+  // Profile Picture Upload
+  async uploadProfilePicture(membershipID: string, imageFile: FormData): Promise<any> {
+    const url = `${this.baseURL}/api/member/upload-photo/${membershipID}`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      body: imageFile,
+      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+  }
+
   // Registration
   async registerUser(formData: FormData): Promise<LoginResponse> {
     return fetch(`${this.baseURL}/api/auth/register`, {
       method: 'POST',
-      body: formData, // FormData for file uploads
+      body: formData,
       headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
     }).then(async (response) => {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
       }
       return response.json();
     });
   }
 
-  // Dashboard & Stats
-  async getDashboardStats(): Promise<any> {
-    return this.request<any>('/api/dashboard/stats');
+  // Check In/Out
+  async checkIn(membershipID: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/api/attendance/checkin', {
+      method: 'POST',
+      body: JSON.stringify({ membershipID, action: 'checkin' }),
+    });
+  }
+
+  async checkOut(membershipID: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/api/attendance/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ membershipID, action: 'checkout' }),
+    });
+  }
+
+  // Dashboard Data
+  async getDashboardData(membershipID: string): Promise<{
+    membershipDetails: MembershipDetails;
+    personalInfo: PersonalInfo;
+    isCheckedIn: boolean;
+    checkInTime?: string;
+  }> {
+    return this.request<{
+      membershipDetails: MembershipDetails;
+      personalInfo: PersonalInfo;
+      isCheckedIn: boolean;
+      checkInTime?: string;
+    }>(`/api/dashboard/member/${membershipID}`);
+  }
+
+  // Payment History
+  async getPaymentHistory(membershipID: string): Promise<{ payments: PaymentHistory[] }> {
+    return this.request<{ payments: PaymentHistory[] }>(`/api/payment/history/${membershipID}`);
+  }
+
+  async downloadInvoice(paymentId: string): Promise<Blob> {
+    const response = await fetch(`${this.baseURL}/api/payment/invoice/${paymentId}`, {
+      method: 'GET',
+      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to download invoice');
+    }
+
+    return response.blob();
+  }
+
+  // Trainer Information
+  async getAssignedTrainer(membershipID: string): Promise<{ trainer: TrainerInfo | null }> {
+    return this.request<{ trainer: TrainerInfo | null }>(`/api/member/trainer/${membershipID}`);
   }
 
   // Membership Plans
-  async getMembershipPlans(): Promise<any> {
-    return this.request<any>('/api/membership/plans');
+  async getMembershipPlans(): Promise<{ plans: MembershipPlan[] }> {
+    return this.request<{ plans: MembershipPlan[] }>('/api/membership/plans');
   }
 
-  // Payments
-  async getPayments(): Promise<any> {
-    return this.request<any>('/api/payment/history');
+  // Notifications
+  async getNotifications(membershipID: string): Promise<{ notifications: any[] }> {
+    return this.request<{ notifications: any[] }>(`/api/notifications/${membershipID}`);
   }
 
-  // Trainers
-  async getTrainers(): Promise<any> {
-    return this.request<any>('/api/admin/trainers');
-  }
-
-  async addTrainer(data: any): Promise<any> {
-    return this.request<any>('/api/admin/trainers', {
-      method: 'POST',
-      body: JSON.stringify(data),
+  async markNotificationAsRead(notificationId: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/api/notifications/read/${notificationId}`, {
+      method: 'PUT',
     });
   }
 }
