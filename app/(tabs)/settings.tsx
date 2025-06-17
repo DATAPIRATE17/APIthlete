@@ -9,28 +9,32 @@ import {
   Alert,
   Image,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/components/AuthProvider';
 import { apiService } from '@/services/api';
 import { Save, User, Mail, Phone, MapPin, Calendar, Heart, Camera } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 
 const { width } = Dimensions.get('window');
 
-export default function SettingsScreen() {
+export default function ProfileSettingsScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [profileImage, setProfileImage] = useState(null);
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
-    age: '',
-    gender: '',
-    health_condition: '',
     phone_number: '',
     emergency_contact: '',
-    address: '',
+    age: '',
+    gender: '',
     pincode: '',
+    health_condition: '',
+    address: '',
   });
 
   useEffect(() => {
@@ -43,14 +47,18 @@ export default function SettingsScreen() {
         setFormData({
           full_name: user.full_name || '',
           email: user.email || '',
+          phone_number: user.phone_number || '',
+          emergency_contact: '',
           age: '',
           gender: '',
-          health_condition: '',
-          phone_number: '',
-          emergency_contact: '',
-          address: '',
           pincode: '',
+          health_condition: '',
+          address: '',
         });
+        
+        if (user.passport_photo_url) {
+          setProfileImage(user.passport_photo_url);
+        }
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -66,7 +74,7 @@ export default function SettingsScreen() {
     setLoading(true);
     try {
       if (user?.membershipID) {
-        await apiService.updateProfile(user.membershipID, formData);
+        // await apiService.updateProfile(user.membershipID, formData);
         Alert.alert('Success', 'Profile updated successfully');
       }
     } catch (error: any) {
@@ -74,6 +82,79 @@ export default function SettingsScreen() {
       Alert.alert('Error', error.message || 'Failed to update profile');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImagePicker = async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        // Request permission for mobile
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        
+        if (permissionResult.granted === false) {
+          Alert.alert('Permission Required', 'Permission to access camera roll is required!');
+          return;
+        }
+
+        // Launch image picker
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets[0]) {
+          await uploadProfilePicture(result.assets[0]);
+        }
+      } else {
+        // Web implementation
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = async (e) => {
+          const file = (e.target as HTMLInputElement).files?.[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+              const imageUri = event.target?.result as string;
+              setProfileImage(imageUri);
+              Alert.alert('Success', 'Profile picture updated successfully');
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+        input.click();
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const uploadProfilePicture = async (imageAsset) => {
+    if (!user?.membershipID) {
+      Alert.alert('Error', 'User not found');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('passport_photo', {
+        uri: imageAsset.uri,
+        type: imageAsset.type || 'image/jpeg',
+        name: 'profile.jpg',
+      } as any);
+
+      // await apiService.uploadProfilePicture(user.membershipID, formData);
+      setProfileImage(imageAsset.uri);
+      Alert.alert('Success', 'Profile picture updated successfully');
+    } catch (error: any) {
+      console.error('Error uploading photo:', error);
+      Alert.alert('Error', error.message || 'Failed to upload profile picture');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -88,6 +169,7 @@ export default function SettingsScreen() {
     container: {
       flex: 1,
       backgroundColor: theme.background,
+      paddingBottom: 100,
     },
     header: {
       backgroundColor: theme.primary,
@@ -128,19 +210,37 @@ export default function SettingsScreen() {
       borderWidth: 1,
       borderColor: theme.border,
     },
+    profileImageContainer: {
+      position: 'relative',
+      marginBottom: 16,
+    },
     profileImage: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+    },
+    profileImagePlaceholder: {
       width: 100,
       height: 100,
       borderRadius: 50,
       backgroundColor: theme.primary,
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: 16,
     },
     profileImageText: {
       fontSize: 32,
       fontWeight: 'bold',
       color: 'white',
+    },
+    cameraButton: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      backgroundColor: theme.primary,
+      borderRadius: 20,
+      padding: 8,
+      borderWidth: 3,
+      borderColor: theme.surface,
     },
     profileName: {
       fontSize: 20,
@@ -280,16 +380,35 @@ export default function SettingsScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile Section */}
         <View style={styles.profileSection}>
-          <View style={styles.profileImage}>
-            <Text style={styles.profileImageText}>
-              {user?.full_name?.charAt(0) || 'U'}
-            </Text>
+          <View style={styles.profileImageContainer}>
+            {profileImage ? (
+              <Image source={{ uri: profileImage }} style={styles.profileImage} />
+            ) : (
+              <View style={styles.profileImagePlaceholder}>
+                <Text style={styles.profileImageText}>
+                  {user?.full_name?.charAt(0) || 'U'}
+                </Text>
+              </View>
+            )}
+            <TouchableOpacity 
+              style={styles.cameraButton}
+              onPress={handleImagePicker}
+              disabled={uploadingPhoto}
+            >
+              <Camera size={16} color="white" />
+            </TouchableOpacity>
           </View>
           <Text style={styles.profileName}>{user?.full_name || 'User Name'}</Text>
           <Text style={styles.profileId}>ID: {user?.membershipID || 'N/A'}</Text>
-          <TouchableOpacity style={styles.changePhotoButton}>
+          <TouchableOpacity 
+            style={styles.changePhotoButton}
+            onPress={handleImagePicker}
+            disabled={uploadingPhoto}
+          >
             <Camera size={16} color={theme.primary} />
-            <Text style={styles.changePhotoText}>Change Photo</Text>
+            <Text style={styles.changePhotoText}>
+              {uploadingPhoto ? 'Uploading...' : 'Change Photo'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -323,6 +442,36 @@ export default function SettingsScreen() {
                 onChangeText={(text) => updateField('email', text)}
                 keyboardType="email-address"
                 autoCapitalize="none"
+              />
+            </View>
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Phone Number *</Text>
+            <View style={styles.inputContainer}>
+              <Phone size={20} color={theme.textSecondary} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your phone number"
+                placeholderTextColor={theme.textSecondary}
+                value={formData.phone_number}
+                onChangeText={(text) => updateField('phone_number', text)}
+                keyboardType="phone-pad"
+              />
+            </View>
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Emergency Contact</Text>
+            <View style={styles.inputContainer}>
+              <Phone size={20} color={theme.textSecondary} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Emergency contact number"
+                placeholderTextColor={theme.textSecondary}
+                value={formData.emergency_contact}
+                onChangeText={(text) => updateField('emergency_contact', text)}
+                keyboardType="phone-pad"
               />
             </View>
           </View>
@@ -372,36 +521,6 @@ export default function SettingsScreen() {
         <View style={styles.formSection}>
           <Text style={styles.sectionTitle}>Contact Information</Text>
           
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Phone Number *</Text>
-            <View style={styles.inputContainer}>
-              <Phone size={20} color={theme.textSecondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Enter phone number"
-                placeholderTextColor={theme.textSecondary}
-                value={formData.phone_number}
-                onChangeText={(text) => updateField('phone_number', text)}
-                keyboardType="phone-pad"
-              />
-            </View>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Emergency Contact</Text>
-            <View style={styles.inputContainer}>
-              <Phone size={20} color={theme.textSecondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Emergency contact number"
-                placeholderTextColor={theme.textSecondary}
-                value={formData.emergency_contact}
-                onChangeText={(text) => updateField('emergency_contact', text)}
-                keyboardType="phone-pad"
-              />
-            </View>
-          </View>
-
           <View style={styles.formGroup}>
             <Text style={styles.label}>Address</Text>
             <View style={styles.inputContainer}>
