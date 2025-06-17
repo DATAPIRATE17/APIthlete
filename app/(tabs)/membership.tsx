@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,132 +10,165 @@ import {
   Image,
 } from 'react-native';
 import { useTheme } from '@/components/ThemeProvider';
-import { Check, Crown, Star, Zap, Shield, Sparkles } from 'lucide-react-native';
+import { useAuth } from '@/components/AuthProvider';
+import { apiService } from '@/services/api';
+import { Check, Crown, Star, Zap, Shield, Sparkles, Dumbbell, Users, Calendar, Target } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
-export default function MembershipScreen() {
+export default function MembershipPlansScreen() {
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const [membershipPlans, setMembershipPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
-  const membershipPlans = [
-    {
-      id: 'annual',
-      name: 'Annual Plan',
-      price: '₹1,200',
-      originalPrice: '₹1,500',
-      duration: 'Renews every 365 days',
-      icon: Crown,
-      color: '#FFD700',
-      popular: true,
-      savings: '20% OFF',
-      features: [
-        'All gym equipment access',
-        'Personal trainer sessions',
-        'Nutrition guidance',
-        'Free locker facility',
-        'Guest passes (2 per month)',
-        'Priority booking',
-        'Free fitness assessment',
-      ],
-    },
-    {
-      id: 'quarterly',
-      name: 'Quarterly Plan',
-      price: '₹5,000',
-      originalPrice: '₹6,000',
-      duration: 'Renews every 90 days',
-      icon: Star,
-      color: '#8B5CF6',
-      popular: false,
-      savings: '15% OFF',
-      features: [
-        'All gym equipment access',
-        'Personal trainer sessions',
-        'Nutrition guidance',
-        'Free locker facility',
-        'Group fitness classes',
-      ],
-    },
-    {
-      id: 'monthly',
-      name: 'Monthly Plan',
-      price: '₹1,000',
-      originalPrice: null,
-      duration: 'Renews every 30 days',
-      icon: Zap,
-      color: '#22C55E',
-      popular: false,
-      savings: null,
-      features: [
-        'All gym equipment access',
-        'Group fitness classes',
-        'Basic nutrition tips',
-        'Locker facility',
-      ],
-    },
-    {
-      id: 'basic',
-      name: 'Basic Plan',
-      price: '₹100',
-      originalPrice: null,
-      duration: 'Monthly renewal',
-      icon: Shield,
-      color: '#6B7280',
-      popular: false,
-      savings: null,
-      features: [
-        'Limited equipment access',
-        'Basic gym facilities',
-        'Community support',
-        'Off-peak hours only',
-      ],
-    },
-    {
-      id: 'starter',
-      name: 'Starter Plan',
-      price: '₹33',
-      originalPrice: null,
-      duration: 'Monthly renewal',
-      icon: Shield,
-      color: '#EF4444',
-      popular: false,
-      savings: null,
-      features: [
-        'Basic equipment access',
-        'Limited hours (6-10 AM)',
-        'No personal training',
-        'Community access',
-      ],
-    },
-  ];
+  useEffect(() => {
+    loadMembershipPlans();
+  }, []);
+
+  const loadMembershipPlans = async () => {
+    try {
+      setLoading(true);
+      // Mock membership plans data - replace with actual API call
+      // const response = await apiService.getMembershipPlans();
+      
+      const mockPlans = [
+        {
+          id: 'annual-premium',
+          name: 'Annual Premium Plan',
+          price: '₹12,000',
+          originalPrice: '₹15,000',
+          duration: 'Renews every 365 days',
+          icon: Crown,
+          color: '#FFD700',
+          popular: true,
+          savings: '20% OFF',
+          features: [
+            'All gym equipment access',
+            'Personal trainer sessions (8 sessions/month)',
+            'Nutrition guidance & meal planning',
+            'Free locker facility',
+            'Guest passes (4 per month)',
+            'Priority booking for classes',
+            'Free fitness assessment',
+            'Access to premium equipment',
+            'Sauna & steam room access',
+            'Free protein shake (1 per day)',
+            'Massage therapy (2 sessions/month)',
+            'Diet consultation with nutritionist'
+          ],
+          perks: [
+            '24/7 gym access',
+            'Free parking',
+            'Towel service',
+            'Premium locker room access'
+          ]
+        },
+        {
+          id: 'quarterly-plus',
+          name: 'Quarterly Plus Plan',
+          price: '₹3,500',
+          originalPrice: '₹4,200',
+          duration: 'Renews every 90 days',
+          icon: Star,
+          color: '#8B5CF6',
+          popular: false,
+          savings: '15% OFF',
+          features: [
+            'All gym equipment access',
+            'Personal trainer sessions (4 sessions/month)',
+            'Basic nutrition guidance',
+            'Free locker facility',
+            'Group fitness classes',
+            'Guest passes (2 per month)',
+            'Fitness assessment',
+            'Access to cardio equipment'
+          ],
+          perks: [
+            'Extended gym hours (5 AM - 11 PM)',
+            'Free parking',
+            'Basic locker room access'
+          ]
+        },
+        {
+          id: 'monthly-standard',
+          name: 'Monthly Standard Plan',
+          price: '₹1,200',
+          originalPrice: null,
+          duration: 'Renews every 30 days',
+          icon: Zap,
+          color: '#22C55E',
+          popular: false,
+          savings: null,
+          features: [
+            'All gym equipment access',
+            'Group fitness classes',
+            'Basic nutrition tips',
+            'Locker facility',
+            'Guest pass (1 per month)',
+            'Fitness consultation'
+          ],
+          perks: [
+            'Standard gym hours (6 AM - 10 PM)',
+            'Basic equipment access'
+          ]
+        },
+        {
+          id: 'basic-plan',
+          name: 'Basic Plan',
+          price: '₹800',
+          originalPrice: null,
+          duration: 'Monthly renewal',
+          icon: Shield,
+          color: '#6B7280',
+          popular: false,
+          savings: null,
+          features: [
+            'Limited equipment access',
+            'Basic gym facilities',
+            'Community support',
+            'Off-peak hours only (10 AM - 4 PM)',
+            'Basic locker facility'
+          ],
+          perks: [
+            'Affordable pricing',
+            'No long-term commitment'
+          ]
+        }
+      ];
+      
+      setMembershipPlans(mockPlans);
+    } catch (error) {
+      console.error('Error loading membership plans:', error);
+      Alert.alert('Error', 'Failed to load membership plans');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePlanSelection = (planId: string) => {
     setSelectedPlan(planId);
     const selectedPlanData = membershipPlans.find(plan => plan.id === planId);
     
     Alert.alert(
-      'Confirm Selection',
-      `You selected ${selectedPlanData?.name} for ${selectedPlanData?.price}. This will redirect you to PhonePe for payment.`,
+      'Upgrade Membership',
+      `You selected ${selectedPlanData?.name} for ${selectedPlanData?.price}. Contact gym administration to upgrade your membership.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
-          text: 'Proceed to Payment', 
-          onPress: () => handlePayment(planId)
+          text: 'Contact Admin', 
+          onPress: () => Alert.alert('Contact', 'Please visit the gym reception or call +91 9876543210')
         },
       ]
     );
-  };
-
-  const handlePayment = (planId: string) => {
-    // TODO: Integrate with PhonePe payment gateway
-    Alert.alert('Payment Integration', 'PhonePe integration will be implemented here');
   };
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.background,
+      paddingBottom: 100,
     },
     header: {
       backgroundColor: theme.primary,
@@ -166,6 +199,30 @@ export default function MembershipScreen() {
     content: {
       flex: 1,
       padding: 20,
+    },
+    currentPlanCard: {
+      backgroundColor: theme.surface,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 20,
+      borderWidth: 2,
+      borderColor: theme.primary,
+    },
+    currentPlanTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: theme.primary,
+      marginBottom: 8,
+    },
+    currentPlanName: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 4,
+    },
+    currentPlanExpiry: {
+      fontSize: 14,
+      color: theme.textSecondary,
     },
     planCard: {
       backgroundColor: theme.surface,
@@ -253,8 +310,17 @@ export default function MembershipScreen() {
       color: theme.textSecondary,
       textDecorationLine: 'line-through',
     },
+    featuresSection: {
+      marginBottom: 20,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 12,
+    },
     featuresList: {
-      marginBottom: 24,
+      marginBottom: 16,
     },
     feature: {
       flexDirection: 'row',
@@ -268,6 +334,26 @@ export default function MembershipScreen() {
       marginLeft: 12,
       flex: 1,
       fontWeight: '500',
+    },
+    perksList: {
+      backgroundColor: theme.background,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 20,
+    },
+    perk: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    perkLast: {
+      marginBottom: 0,
+    },
+    perkText: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      marginLeft: 8,
+      flex: 1,
     },
     selectButton: {
       backgroundColor: theme.primary,
@@ -327,11 +413,18 @@ export default function MembershipScreen() {
 
       {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Current Plan */}
+        <View style={styles.currentPlanCard}>
+          <Text style={styles.currentPlanTitle}>Your Current Plan</Text>
+          <Text style={styles.currentPlanName}>Annual Premium Plan</Text>
+          <Text style={styles.currentPlanExpiry}>Expires on: December 31, 2024</Text>
+        </View>
+
         {/* Recommended Section */}
         <View style={styles.recommendedSection}>
-          <Text style={styles.recommendedTitle}>💪 Most Popular Choice</Text>
+          <Text style={styles.recommendedTitle}>💪 Upgrade Your Experience</Text>
           <Text style={styles.recommendedText}>
-            Our Annual Plan offers the best value with maximum savings and premium features
+            Explore our premium plans with enhanced features and exclusive benefits
           </Text>
         </View>
 
@@ -379,14 +472,31 @@ export default function MembershipScreen() {
               )}
             </View>
 
-            <View style={styles.featuresList}>
-              {plan.features.map((feature, index) => (
-                <View key={index} style={styles.feature}>
-                  <Check size={18} color={theme.success} />
-                  <Text style={styles.featureText}>{feature}</Text>
-                </View>
-              ))}
+            <View style={styles.featuresSection}>
+              <Text style={styles.sectionTitle}>Features Included</Text>
+              <View style={styles.featuresList}>
+                {plan.features.map((feature, index) => (
+                  <View key={index} style={styles.feature}>
+                    <Check size={18} color={theme.success} />
+                    <Text style={styles.featureText}>{feature}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
+
+            {plan.perks && plan.perks.length > 0 && (
+              <View style={styles.featuresSection}>
+                <Text style={styles.sectionTitle}>Additional Perks</Text>
+                <View style={styles.perksList}>
+                  {plan.perks.map((perk, index) => (
+                    <View key={index} style={[styles.perk, index === plan.perks.length - 1 && styles.perkLast]}>
+                      <Target size={14} color={theme.primary} />
+                      <Text style={styles.perkText}>{perk}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
 
             <TouchableOpacity
               style={[
