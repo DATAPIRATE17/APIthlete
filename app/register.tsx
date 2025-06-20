@@ -16,6 +16,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { apiService } from '@/services/api';
 import { User, Mail, Phone, MapPin, Calendar, Heart, Users, Clock, ArrowLeft, CircleCheck as CheckCircle, Upload, FileText } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 
 const { width } = Dimensions.get('window');
 
@@ -29,11 +30,13 @@ interface FormData {
   emergency_contact: string;
   address: string;
   pincode: string;
-  preferred_time_slot: string;
+  availability: string;
   identity_type: string;
   identity_number: string;
   health_condition: string;
+  passport_photo?: any;
   identity_document?: any;
+  trainer_name?: string;
 }
 
 export default function RegisterScreen() {
@@ -44,19 +47,20 @@ export default function RegisterScreen() {
     phone_number: phoneNumber || '',
     age: '',
     date_of_birth: '',
-    gender: '',
+    gender: 'male',
     emergency_contact: '',
     address: '',
     pincode: '',
-    preferred_time_slot: '',
-    identity_type: '',
+    availability: 'Morning',
+    identity_type: 'Aadhar Card',
     identity_number: '',
     health_condition: 'Normal',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [selectedDocument, setSelectedDocument] = useState<any>(null);
+  const [passportPhoto, setPassportPhoto] = useState<any>(null);
   const router = useRouter();
   const { theme } = useTheme();
 
@@ -71,7 +75,7 @@ export default function RegisterScreen() {
       case 2:
         return !!(formData.age && formData.date_of_birth && formData.gender && formData.emergency_contact);
       case 3:
-        return !!(formData.address && formData.pincode && formData.preferred_time_slot);
+        return !!(formData.address && formData.pincode && formData.availability);
       case 4:
         return !!(formData.identity_type && formData.identity_number && formData.health_condition);
       default:
@@ -93,6 +97,32 @@ export default function RegisterScreen() {
     setError('');
   };
 
+  const handlePassportPhotoPicker = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 5],
+        quality: 0.7,
+        base64: true
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const photo = result.assets[0];
+        
+        setPassportPhoto({
+          uri: photo.uri,
+          name: `passport_photo_${Date.now()}.jpg`,
+          type: 'image/jpeg',
+          base64: photo.base64
+        });
+      }
+    } catch (error) {
+      console.error('Error picking passport photo:', error);
+      Alert.alert('Error', 'Failed to pick passport photo');
+    }
+  };
+
   const handleDocumentPicker = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -110,7 +140,6 @@ export default function RegisterScreen() {
         }
 
         setSelectedDocument(file);
-        setFormData(prev => ({ ...prev, identity_document: file }));
       }
     } catch (error) {
       console.error('Error picking document:', error);
@@ -130,13 +159,23 @@ export default function RegisterScreen() {
     try {
       const formDataToSend = new FormData();
       
+      // Append all form data
       Object.entries(formData).forEach(([key, value]) => {
-        if (value && key !== 'identity_document') {
+        if (value) {
           formDataToSend.append(key, value);
         }
       });
 
-      // Add identity document if selected
+      // Append passport photo if selected
+      if (passportPhoto) {
+        formDataToSend.append('passport_photo', {
+          uri: passportPhoto.uri,
+          type: passportPhoto.type,
+          name: passportPhoto.name,
+        } as any);
+      }
+
+      // Append identity document if selected
       if (selectedDocument) {
         formDataToSend.append('identity_document', {
           uri: selectedDocument.uri,
@@ -150,11 +189,11 @@ export default function RegisterScreen() {
       if (response.token) {
         Alert.alert(
           'Registration Successful!',
-          `Welcome ${formData.full_name}! Your membership ID is ${response.user?.membershipID}. Please login with your phone number.`,
+          `Welcome ${formData.full_name}! Your membership ID is ${response.user?.membershipID}.`,
           [
             {
-              text: 'Continue to Login',
-              onPress: () => router.replace('/login')
+              text: 'Continue to Dashboard',
+              onPress: () => router.replace('/(tabs)')
             }
           ]
         );
@@ -322,6 +361,26 @@ export default function RegisterScreen() {
           />
         </View>
       </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Passport Photo *</Text>
+        <Text style={styles.inputSubLabel}>Clear face photo for identification</Text>
+        <TouchableOpacity
+          style={styles.documentButton}
+          onPress={handlePassportPhotoPicker}
+        >
+          <Upload size={20} color={theme.primary} />
+          <Text style={styles.documentButtonText}>
+            {passportPhoto ? 'Photo Selected' : 'Choose Photo'}
+          </Text>
+        </TouchableOpacity>
+        {passportPhoto && (
+          <View style={styles.selectedFile}>
+            <FileText size={16} color={theme.success} />
+            <Text style={styles.selectedFileText}>Passport photo selected</Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 
@@ -356,6 +415,21 @@ export default function RegisterScreen() {
             value={formData.pincode}
             onChangeText={(text) => updateField('pincode', text)}
             keyboardType="numeric"
+            maxLength={6}
+          />
+        </View>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Trainer Name (Optional)</Text>
+        <View style={styles.inputWrapper}>
+          <Users size={20} color={theme.textSecondary} style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Enter preferred trainer name"
+            placeholderTextColor={theme.textSecondary}
+            value={formData.trainer_name || ''}
+            onChangeText={(text) => updateField('trainer_name', text)}
           />
         </View>
       </View>
@@ -368,15 +442,15 @@ export default function RegisterScreen() {
               key={time}
               style={[
                 styles.timeSlotButton,
-                formData.preferred_time_slot === time && styles.timeSlotButtonActive,
+                formData.availability === time && styles.timeSlotButtonActive,
               ]}
-              onPress={() => updateField('preferred_time_slot', time)}
+              onPress={() => updateField('availability', time)}
             >
-              <Clock size={16} color={formData.preferred_time_slot === time ? 'white' : theme.textSecondary} />
+              <Clock size={16} color={formData.availability === time ? 'white' : theme.textSecondary} />
               <Text
                 style={[
                   styles.timeSlotButtonText,
-                  formData.preferred_time_slot === time && styles.timeSlotButtonTextActive,
+                  formData.availability === time && styles.timeSlotButtonTextActive,
                 ]}
               >
                 {time}
@@ -459,7 +533,7 @@ export default function RegisterScreen() {
       </View>
 
       <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Upload Identity Document</Text>
+        <Text style={styles.inputLabel}>Upload Identity Document *</Text>
         <Text style={styles.inputSubLabel}>Images or PDF files, max 5MB</Text>
         <TouchableOpacity
           style={styles.documentButton}
