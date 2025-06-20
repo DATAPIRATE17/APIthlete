@@ -8,160 +8,198 @@ import {
   Alert,
   Dimensions,
   Image,
+  ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { apiService } from '@/services/api';
 import { Check, Crown, Star, Zap, Shield, Sparkles, Dumbbell, Users, Calendar, Target } from 'lucide-react-native';
 
+const API_BASE_URL = 'https://api.apithlete.webgeon.com';
 const { width } = Dimensions.get('window');
+
+interface MembershipPlan {
+  _id: string;
+  name: string;
+  price: number;
+  renewal: number;
+  description: string;
+  perks?: string[];
+  popular?: boolean;
+  color?: string;
+}
 
 export default function MembershipPlansScreen() {
   const { theme } = useTheme();
-  const { user } = useAuth();
-  const [membershipPlans, setMembershipPlans] = useState([]);
+  const { user, updateUser } = useAuth();
+  const [membershipPlans, setMembershipPlans] = useState<MembershipPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [currentPlan, setCurrentPlan] = useState<any>(null);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadMembershipPlans();
+    loadCurrentPlan();
   }, []);
 
   const loadMembershipPlans = async () => {
     try {
       setLoading(true);
-      // Mock membership plans data - replace with actual API call
-      // const response = await apiService.getMembershipPlans();
+      setError(null);
       
-      const mockPlans = [
-        {
-          id: 'annual-premium',
-          name: 'Annual Premium Plan',
-          price: '₹12,000',
-          originalPrice: '₹15,000',
-          duration: 'Renews every 365 days',
-          icon: Crown,
-          color: '#FFD700',
-          popular: true,
-          savings: '20% OFF',
-          features: [
-            'All gym equipment access',
-            'Personal trainer sessions (8 sessions/month)',
-            'Nutrition guidance & meal planning',
-            'Free locker facility',
-            'Guest passes (4 per month)',
-            'Priority booking for classes',
-            'Free fitness assessment',
-            'Access to premium equipment',
-            'Sauna & steam room access',
-            'Free protein shake (1 per day)',
-            'Massage therapy (2 sessions/month)',
-            'Diet consultation with nutritionist'
-          ],
-          perks: [
-            '24/7 gym access',
-            'Free parking',
-            'Towel service',
-            'Premium locker room access'
-          ]
+      const response = await fetch(`${API_BASE_URL}/api/membership/all`, {
+        headers: {
+          'Authorization': `Bearer ${user?.token}`,
+          'Content-Type': 'application/json',
         },
-        {
-          id: 'quarterly-plus',
-          name: 'Quarterly Plus Plan',
-          price: '₹3,500',
-          originalPrice: '₹4,200',
-          duration: 'Renews every 90 days',
-          icon: Star,
-          color: '#8B5CF6',
-          popular: false,
-          savings: '15% OFF',
-          features: [
-            'All gym equipment access',
-            'Personal trainer sessions (4 sessions/month)',
-            'Basic nutrition guidance',
-            'Free locker facility',
-            'Group fitness classes',
-            'Guest passes (2 per month)',
-            'Fitness assessment',
-            'Access to cardio equipment'
-          ],
-          perks: [
-            'Extended gym hours (5 AM - 11 PM)',
-            'Free parking',
-            'Basic locker room access'
-          ]
-        },
-        {
-          id: 'monthly-standard',
-          name: 'Monthly Standard Plan',
-          price: '₹1,200',
-          originalPrice: null,
-          duration: 'Renews every 30 days',
-          icon: Zap,
-          color: '#22C55E',
-          popular: false,
-          savings: null,
-          features: [
-            'All gym equipment access',
-            'Group fitness classes',
-            'Basic nutrition tips',
-            'Locker facility',
-            'Guest pass (1 per month)',
-            'Fitness consultation'
-          ],
-          perks: [
-            'Standard gym hours (6 AM - 10 PM)',
-            'Basic equipment access'
-          ]
-        },
-        {
-          id: 'basic-plan',
-          name: 'Basic Plan',
-          price: '₹800',
-          originalPrice: null,
-          duration: 'Monthly renewal',
-          icon: Shield,
-          color: '#6B7280',
-          popular: false,
-          savings: null,
-          features: [
-            'Limited equipment access',
-            'Basic gym facilities',
-            'Community support',
-            'Off-peak hours only (10 AM - 4 PM)',
-            'Basic locker facility'
-          ],
-          perks: [
-            'Affordable pricing',
-            'No long-term commitment'
-          ]
-        }
-      ];
+      });
       
-      setMembershipPlans(mockPlans);
+      const data = await response.json();
+      
+      if (data.success) {
+        setMembershipPlans(data.plans);
+      } else {
+        setError(data.message || 'Failed to load membership plans');
+      }
     } catch (error) {
       console.error('Error loading membership plans:', error);
-      Alert.alert('Error', 'Failed to load membership plans');
+      setError('Failed to load membership plans. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
 
+  const loadCurrentPlan = async () => {
+    try {
+      if (user?.membershipID) {
+        const response = await fetch(`${API_BASE_URL}/api/payment/payment-details/${user.membershipID}`, {
+          headers: {
+            'Authorization': `Bearer ${user?.token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        const data = await response.json();
+        
+        if (data.membership_plan) {
+          setCurrentPlan({
+            name: data.membership_plan,
+            expiry: data.renewal_date ? new Date(data.renewal_date).toLocaleDateString() : 'Not available'
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading current plan:', error);
+    }
+  };
+
   const handlePlanSelection = (planId: string) => {
     setSelectedPlan(planId);
-    const selectedPlanData = membershipPlans.find(plan => plan.id === planId);
+    const selectedPlanData = membershipPlans.find(plan => plan._id === planId);
     
+    if (!user?.membershipID) {
+      setError('User membership ID not found');
+      return;
+    }
+
     Alert.alert(
       'Upgrade Membership',
-      `You selected ${selectedPlanData?.name} for ${selectedPlanData?.price}. Contact gym administration to upgrade your membership.`,
+      `You selected ${selectedPlanData?.name} for ₹${selectedPlanData?.price}. Do you want to proceed with payment?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => setSelectedPlan(null) },
         { 
-          text: 'Contact Admin', 
-          onPress: () => Alert.alert('Contact', 'Please visit the gym reception or call +91 9876543210')
+          text: 'Proceed to Payment', 
+          onPress: () => initiatePaymentProcess(planId, selectedPlanData)
         },
       ]
     );
+  };
+
+  const initiatePaymentProcess = async (planId: string, planData: MembershipPlan) => {
+    try {
+      setProcessingPayment(true);
+      setError(null);
+      
+      const response = await fetch(`${API_BASE_URL}/api/payment/initiate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${user?.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          membershipID: user?.membershipID,
+          membership_plan: planData.name
+        }),
+      });
+      
+      const data = await response.json();
+
+      if (data.success && data.checkoutUrl) {
+        // Open the payment URL in browser
+        const canOpen = await Linking.canOpenURL(data.checkoutUrl);
+        if (canOpen) {
+          await Linking.openURL(data.checkoutUrl);
+          // Start polling for payment status
+          pollPaymentStatus(data.orderId);
+        } else {
+          setError('Cannot open payment link');
+        }
+      } else {
+        setError(data.error || 'Failed to initiate payment');
+        setSelectedPlan(null);
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      setError('Failed to process payment. Please try again.');
+      setSelectedPlan(null);
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
+  const pollPaymentStatus = async (orderId: string) => {
+    try {
+      let attempts = 0;
+      const maxAttempts = 10;
+      const interval = setInterval(async () => {
+        attempts++;
+        
+        const response = await fetch(`${API_BASE_URL}/api/payment/status/${orderId}`, {
+          headers: {
+            'Authorization': `Bearer ${user?.token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'SUCCESS') {
+          clearInterval(interval);
+          Alert.alert('Payment Successful', 'Your membership has been upgraded successfully!');
+          loadCurrentPlan();
+          // Refresh user data
+          if (user) {
+            const userResponse = await fetch(`${API_BASE_URL}/api/user/${user.membershipID}`, {
+              headers: {
+                'Authorization': `Bearer ${user?.token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            const userData = await userResponse.json();
+            if (userData.success) {
+              updateUser(userData.user);
+            }
+          }
+        } else if (attempts >= maxAttempts) {
+          clearInterval(interval);
+          Alert.alert('Payment Pending', 'Payment is still processing. Please check your payment history later.');
+        }
+      }, 3000);
+    } catch (error) {
+      console.error('Payment status polling error:', error);
+    }
   };
 
   const styles = StyleSheet.create({
@@ -396,7 +434,59 @@ export default function MembershipPlansScreen() {
       textAlign: 'center',
       lineHeight: 20,
     },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
   });
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Membership Plans</Text>
+          <Text style={styles.headerSubtitle}>Choose the perfect plan for your fitness journey</Text>
+        </View>
+        
+        <View style={[styles.content, { justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={{ color: theme.error, marginBottom: 20 }}>{error}</Text>
+          <TouchableOpacity
+            style={styles.selectButton}
+            onPress={() => {
+              setError(null);
+              loadMembershipPlans();
+            }}
+          >
+            <Text style={styles.selectButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
+  if (membershipPlans.length === 0 && !loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Membership Plans</Text>
+          <Text style={styles.headerSubtitle}>Choose the perfect plan for your fitness journey</Text>
+        </View>
+        
+        <View style={[styles.content, { justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={{ color: theme.textSecondary }}>No membership plans available.</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -414,11 +504,13 @@ export default function MembershipPlansScreen() {
       {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Current Plan */}
-        <View style={styles.currentPlanCard}>
-          <Text style={styles.currentPlanTitle}>Your Current Plan</Text>
-          <Text style={styles.currentPlanName}>Annual Premium Plan</Text>
-          <Text style={styles.currentPlanExpiry}>Expires on: December 31, 2024</Text>
-        </View>
+        {currentPlan && (
+          <View style={styles.currentPlanCard}>
+            <Text style={styles.currentPlanTitle}>Your Current Plan</Text>
+            <Text style={styles.currentPlanName}>{currentPlan.name}</Text>
+            <Text style={styles.currentPlanExpiry}>Expires on: {currentPlan.expiry}</Text>
+          </View>
+        )}
 
         {/* Recommended Section */}
         <View style={styles.recommendedSection}>
@@ -430,13 +522,14 @@ export default function MembershipPlansScreen() {
 
         {membershipPlans.map((plan) => (
           <TouchableOpacity
-            key={plan.id}
+            key={plan._id}
             style={[
               styles.planCard,
-              selectedPlan === plan.id && styles.planCardSelected,
+              selectedPlan === plan._id && styles.planCardSelected,
             ]}
-            onPress={() => handlePlanSelection(plan.id)}
+            onPress={() => handlePlanSelection(plan._id)}
             activeOpacity={0.9}
+            disabled={processingPayment}
           >
             {plan.popular && (
               <View style={styles.popularBadge}>
@@ -445,37 +538,34 @@ export default function MembershipPlansScreen() {
               </View>
             )}
             
-            {plan.savings && (
-              <View style={styles.savingsBadge}>
-                <Text style={styles.savingsText}>{plan.savings}</Text>
-              </View>
-            )}
-            
             <View style={styles.planHeader}>
-              <plan.icon 
-                size={40} 
-                color={plan.color} 
-                style={styles.planIcon}
-              />
+              <View style={styles.planIcon}>
+                {plan.name.includes('Premium') ? (
+                  <Crown size={40} color={plan.color || theme.primary} />
+                ) : plan.name.includes('Standard') ? (
+                  <Star size={40} color={plan.color || theme.primary} />
+                ) : (
+                  <Zap size={40} color={plan.color || theme.primary} />
+                )}
+              </View>
               <View style={styles.planInfo}>
                 <Text style={styles.planName}>{plan.name}</Text>
-                <Text style={styles.planDuration}>{plan.duration}</Text>
+                <Text style={styles.planDuration}>
+                  {plan.renewal === 1 ? 'Monthly renewal' : `Renews every ${plan.renewal} months`}
+                </Text>
               </View>
             </View>
 
             <View style={styles.priceContainer}>
-              <Text style={[styles.planPrice, { color: plan.color }]}>
-                {plan.price}
+              <Text style={[styles.planPrice, { color: plan.color || theme.primary }]}>
+                ₹{plan.price}
               </Text>
-              {plan.originalPrice && (
-                <Text style={styles.originalPrice}>{plan.originalPrice}</Text>
-              )}
             </View>
 
             <View style={styles.featuresSection}>
               <Text style={styles.sectionTitle}>Features Included</Text>
               <View style={styles.featuresList}>
-                {plan.features.map((feature, index) => (
+                {plan.description.split('\n').map((feature, index) => (
                   <View key={index} style={styles.feature}>
                     <Check size={18} color={theme.success} />
                     <Text style={styles.featureText}>{feature}</Text>
@@ -501,13 +591,18 @@ export default function MembershipPlansScreen() {
             <TouchableOpacity
               style={[
                 styles.selectButton,
-                selectedPlan === plan.id && styles.selectButtonSelected,
+                selectedPlan === plan._id && styles.selectButtonSelected,
               ]}
-              onPress={() => handlePlanSelection(plan.id)}
+              onPress={() => handlePlanSelection(plan._id)}
+              disabled={processingPayment}
             >
-              <Text style={styles.selectButtonText}>
-                {selectedPlan === plan.id ? '✓ Selected' : 'Select Plan'}
-              </Text>
+              {processingPayment && selectedPlan === plan._id ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.selectButtonText}>
+                  {selectedPlan === plan._id ? '✓ Selected' : 'Select Plan'}
+                </Text>
+              )}
             </TouchableOpacity>
           </TouchableOpacity>
         ))}
