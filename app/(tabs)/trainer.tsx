@@ -8,19 +8,36 @@ import {
   Alert,
   Dimensions,
   Image,
+  ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { apiService } from '@/services/api';
 import { Users, Star, Calendar, Phone, MapPin, Clock, CircleCheck as CheckCircle, User, Mail, Target, Award } from 'lucide-react-native';
 
+const API_BASE_URL = 'https://api.apithlete.webgeon.com';
 const { width } = Dimensions.get('window');
+
+interface Trainer {
+  trainerID?: string;
+  trainer_name?: string;
+  specialization?: string;
+  phone_number?: string;
+  passport_photo_url?: string;
+  assigned_Members?: number;
+  availability?: string[];
+  email?: string;
+  rating?: string;
+  bio?: string;
+  weeklySchedule?: Record<string, string>;
+}
 
 export default function MyTrainerScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const [assignedTrainer, setAssignedTrainer] = useState(null);
+  const [assignedTrainer, setAssignedTrainer] = useState<Trainer | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     loadAssignedTrainer();
@@ -29,46 +46,57 @@ export default function MyTrainerScreen() {
   const loadAssignedTrainer = async () => {
     try {
       setLoading(true);
-      // Mock assigned trainer data - replace with actual API call
-      // const response = await apiService.getAssignedTrainer(user?.membershipID);
+      setError('');
       
-      const mockTrainer = {
-        id: 'TR001',
-        name: 'Sarah Johnson',
-        trainerId: 'TR001',
-        specialization: 'Strength Training & Yoga',
-        experience: '5 years',
-        rating: 4.9,
-        image: 'https://images.pexels.com/photos/3768916/pexels-photo-3768916.jpeg',
-        bio: 'Certified strength trainer with expertise in powerlifting, bodybuilding, and yoga. Passionate about helping clients achieve their fitness goals.',
-        phone: '+91 9876543210',
-        email: 'sarah.johnson@gym.com',
-        availability: 'Available Today',
-        isAvailable: true,
-        weeklySchedule: {
-          Monday: '6:00 AM - 10:00 AM, 6:00 PM - 9:00 PM',
-          Tuesday: '6:00 AM - 10:00 AM, 6:00 PM - 9:00 PM',
-          Wednesday: '6:00 AM - 10:00 AM, 6:00 PM - 9:00 PM',
-          Thursday: '6:00 AM - 10:00 AM, 6:00 PM - 9:00 PM',
-          Friday: '6:00 AM - 10:00 AM, 6:00 PM - 9:00 PM',
-          Saturday: '7:00 AM - 12:00 PM',
-          Sunday: 'Rest Day'
+      if (!user?.membershipID) {
+        throw new Error('No membership ID found');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/admin/trainers/${user.membershipID}`, {
+        headers: {
+          'Authorization': `Bearer ${user?.token}`,
+          'Content-Type': 'application/json',
         },
-        assignedCustomers: 15,
-        achievements: [
-          'Certified Personal Trainer (ACSM)',
-          'Yoga Alliance Certified (RYT-200)',
-          'Nutrition Specialist',
-          'First Aid & CPR Certified'
-        ],
-        assignedDate: '2024-01-15',
-        nextSession: '2024-02-15 07:00 AM'
-      };
+      });
       
-      setAssignedTrainer(mockTrainer);
+      if (!response.ok) {
+        throw new Error('Failed to fetch trainer');
+      }
+
+      const data = await response.json();
+      
+      if (!data.trainer_name) {
+        setAssignedTrainer(null);
+        return;
+      }
+
+      // Format the trainer data with default values where needed
+      const formattedTrainer: Trainer = {
+        trainerID: data.trainerID,
+        trainer_name: data.trainer_name,
+        specialization: data.specialization || 'General Fitness',
+        passport_photo_url: data.passport_photo_url,
+        phone_number: data.phone_number,
+        email: data.email || `${data.trainer_name.toLowerCase().replace(/\s+/g, '.')}@gym.com`,
+        rating: '4.8',
+        bio: 'Certified trainer with expertise in various fitness disciplines.',
+        availability: data.availability,
+        weeklySchedule: {
+          Monday: '6:00 AM - 12:00 PM',
+          Tuesday: '6:00 AM - 12:00 PM',
+          Wednesday: '6:00 AM - 12:00 PM',
+          Thursday: '6:00 AM - 12:00 PM',
+          Friday: '6:00 AM - 12:00 PM',
+          Saturday: 'Rest Day',
+          Sunday: 'Rest Day'
+        }
+      };
+
+      setAssignedTrainer(formattedTrainer);
     } catch (error) {
       console.error('Error loading assigned trainer:', error);
-      Alert.alert('Error', 'Failed to load trainer information');
+      setError(error.message || 'Failed to load trainer information');
+      setAssignedTrainer(null);
     } finally {
       setLoading(false);
     }
@@ -77,28 +105,22 @@ export default function MyTrainerScreen() {
   const handleContactTrainer = (type: 'phone' | 'email') => {
     if (!assignedTrainer) return;
     
-    if (type === 'phone') {
+    if (type === 'phone' && assignedTrainer.phone_number) {
       Alert.alert(
         'Contact Trainer',
-        `Call ${assignedTrainer.name}?`,
+        `Call ${assignedTrainer.trainer_name} at ${assignedTrainer.phone_number}?`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Call', onPress: () => {
-            // In a real app, this would open the phone dialer
-            Alert.alert('Feature', 'Phone dialer would open here');
-          }}
+          { text: 'Call', onPress: () => Linking.openURL(`tel:${assignedTrainer.phone_number}`) }
         ]
       );
-    } else {
+    } else if (type === 'email' && assignedTrainer.email) {
       Alert.alert(
         'Contact Trainer',
-        `Send email to ${assignedTrainer.name}?`,
+        `Send email to ${assignedTrainer.trainer_name} at ${assignedTrainer.email}?`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Email', onPress: () => {
-            // In a real app, this would open the email client
-            Alert.alert('Feature', 'Email client would open here');
-          }}
+          { text: 'Email', onPress: () => Linking.openURL(`mailto:${assignedTrainer.email}`) }
         ]
       );
     }
@@ -380,6 +402,16 @@ export default function MyTrainerScreen() {
       fontSize: 14,
       color: theme.text,
     },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    errorText: {
+      color: theme.error,
+      textAlign: 'center',
+      marginTop: 20,
+    },
   });
 
   if (loading) {
@@ -388,6 +420,29 @@ export default function MyTrainerScreen() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>My Trainer</Text>
           <Text style={styles.headerSubtitle}>Loading trainer information...</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Trainer</Text>
+          <Text style={styles.headerSubtitle}>Error loading information</Text>
+        </View>
+        <View style={styles.content}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={[styles.contactButton, { marginTop: 20 }]}
+            onPress={loadAssignedTrainer}
+          >
+            <Text style={styles.contactButtonText}>Try Again</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -408,7 +463,7 @@ export default function MyTrainerScreen() {
 
       {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {!assignedTrainer ? (
+        {!assignedTrainer?.trainer_name ? (
           <View style={styles.noTrainerCard}>
             <Users size={48} color={theme.textSecondary} style={styles.noTrainerIcon} />
             <Text style={styles.noTrainerTitle}>No Trainer Assigned</Text>
@@ -420,35 +475,47 @@ export default function MyTrainerScreen() {
           <View style={styles.trainerCard}>
             {/* Trainer Header */}
             <View style={styles.trainerHeader}>
-              <Image
-                source={{ uri: assignedTrainer.image }}
-                style={styles.trainerImage}
-                resizeMode="cover"
-              />
+              {assignedTrainer.passport_photo_url ? (
+                <Image
+                  source={{ uri: assignedTrainer.passport_photo_url }}
+                  style={styles.trainerImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.trainerImage, { backgroundColor: theme.primary, justifyContent: 'center', alignItems: 'center' }]}>
+                  <User size={40} color="white" />
+                </View>
+              )}
               <View style={styles.trainerInfo}>
-                <Text style={styles.trainerName}>{assignedTrainer.name}</Text>
-                <Text style={styles.trainerId}>ID: {assignedTrainer.trainerId}</Text>
-                <Text style={styles.trainerSpecialization}>{assignedTrainer.specialization}</Text>
+                <Text style={styles.trainerName}>{assignedTrainer.trainer_name}</Text>
+                {assignedTrainer.trainerID && (
+                  <Text style={styles.trainerId}>ID: {assignedTrainer.trainerID}</Text>
+                )}
+                {assignedTrainer.specialization && (
+                  <Text style={styles.trainerSpecialization}>{assignedTrainer.specialization}</Text>
+                )}
                 <View style={styles.ratingContainer}>
                   <Star size={16} color="#FFD700" fill="#FFD700" />
-                  <Text style={styles.rating}>{assignedTrainer.rating}</Text>
+                  <Text style={styles.rating}>4.8</Text>
                 </View>
               </View>
             </View>
 
             {/* Availability */}
-            <View style={[
-              styles.availabilityContainer,
-              !assignedTrainer.isAvailable && styles.unavailableContainer
-            ]}>
-              <CheckCircle size={12} color={assignedTrainer.isAvailable ? theme.success : theme.error} />
-              <Text style={[
-                styles.availabilityText,
-                !assignedTrainer.isAvailable && styles.unavailableText
+            {assignedTrainer.availability && (
+              <View style={[
+                styles.availabilityContainer,
+                !assignedTrainer.availability.includes('Morning') && styles.unavailableContainer
               ]}>
-                {assignedTrainer.availability}
-              </Text>
-            </View>
+                <CheckCircle size={12} color={assignedTrainer.availability.includes('Morning') ? theme.success : theme.error} />
+                <Text style={[
+                  styles.availabilityText,
+                  !assignedTrainer.availability.includes('Morning') && styles.unavailableText
+                ]}>
+                  {assignedTrainer.availability.includes('Morning') ? 'Available Today' : 'Not Available Today'}
+                </Text>
+              </View>
+            )}
 
             {/* Bio */}
             <Text style={styles.trainerBio}>{assignedTrainer.bio}</Text>
@@ -460,6 +527,7 @@ export default function MyTrainerScreen() {
                 <TouchableOpacity
                   style={styles.contactButton}
                   onPress={() => handleContactTrainer('phone')}
+                  disabled={!assignedTrainer.phone_number}
                 >
                   <Phone size={16} color="white" />
                   <Text style={styles.contactButtonText}>Call</Text>
@@ -468,6 +536,7 @@ export default function MyTrainerScreen() {
                 <TouchableOpacity
                   style={styles.contactButton}
                   onPress={() => handleContactTrainer('email')}
+                  disabled={!assignedTrainer.email}
                 >
                   <Mail size={16} color="white" />
                   <Text style={styles.contactButtonText}>Email</Text>
@@ -475,75 +544,29 @@ export default function MyTrainerScreen() {
               </View>
             </View>
 
-            {/* Stats */}
-            <View style={styles.statsSection}>
-              <Text style={styles.sectionTitle}>Trainer Stats</Text>
-              <View style={styles.statsContainer}>
-                <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{assignedTrainer.experience}</Text>
-                  <Text style={styles.statLabel}>Experience</Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{assignedTrainer.assignedCustomers}</Text>
-                  <Text style={styles.statLabel}>Assigned Customers</Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{assignedTrainer.rating}</Text>
-                  <Text style={styles.statLabel}>Rating</Text>
-                </View>
-              </View>
-            </View>
-
             {/* Weekly Schedule */}
-            <View style={styles.scheduleSection}>
-              <Text style={styles.sectionTitle}>Weekly Schedule</Text>
-              <View style={styles.scheduleCard}>
-                {Object.entries(assignedTrainer.weeklySchedule).map(([day, time], index, array) => (
-                  <View 
-                    key={day} 
-                    style={[
-                      styles.scheduleRow,
-                      index === array.length - 1 && styles.scheduleRowLast
-                    ]}
-                  >
-                    <Text style={styles.scheduleDay}>{day}</Text>
-                    <Text style={[
-                      styles.scheduleTime,
-                      time === 'Rest Day' && styles.restDay
-                    ]}>
-                      {time}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            {/* Achievements */}
-            <View style={styles.achievementsSection}>
-              <Text style={styles.sectionTitle}>Certifications & Achievements</Text>
-              <View style={styles.achievementsList}>
-                {assignedTrainer.achievements.map((achievement, index) => (
-                  <View 
-                    key={index}
-                    style={[
-                      styles.achievementItem,
-                      index === assignedTrainer.achievements.length - 1 && styles.achievementItemLast
-                    ]}
-                  >
-                    <Award size={16} color={theme.primary} />
-                    <Text style={styles.achievementText}>{achievement}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            {/* Next Session Info */}
-            {assignedTrainer.nextSession && (
-              <View style={styles.sessionInfo}>
-                <Text style={styles.sessionTitle}>Next Session</Text>
-                <Text style={styles.sessionDetails}>
-                  Scheduled for {assignedTrainer.nextSession}
-                </Text>
+            {assignedTrainer.weeklySchedule && (
+              <View style={styles.scheduleSection}>
+                <Text style={styles.sectionTitle}>Weekly Schedule</Text>
+                <View style={styles.scheduleCard}>
+                  {Object.entries(assignedTrainer.weeklySchedule).map(([day, time], index, array) => (
+                    <View 
+                      key={day} 
+                      style={[
+                        styles.scheduleRow,
+                        index === array.length - 1 && styles.scheduleRowLast
+                      ]}
+                    >
+                      <Text style={styles.scheduleDay}>{day}</Text>
+                      <Text style={[
+                        styles.scheduleTime,
+                        time === 'Rest Day' && styles.restDay
+                      ]}>
+                        {time}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             )}
           </View>
