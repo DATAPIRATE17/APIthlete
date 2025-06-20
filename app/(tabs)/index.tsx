@@ -9,59 +9,97 @@ import {
   Alert,
   Image,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { apiService } from '@/services/api';
 import { Menu, Bell, Sun, Moon, LogOut, User, ChevronDown, Activity, Users, CreditCard, TrendingUp, Dumbbell, Calendar, Target, Clock, CircleCheck as CheckCircle, Circle as XCircle, MapPin, Phone, Mail, UserCheck, UserX, Shield, Heart, Chrome as Home } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
+interface MembershipDetails {
+  status: string;
+  membershipID: string;
+  plan: string;
+  paymentStatus: string;
+  expiryDate: string;
+  joinDate: string;
+}
+
+interface PersonalInfo {
+  age?: string;
+  gender?: string;
+  phone_number?: string;
+  address?: string;
+  emergency_contact?: string;
+  health_condition?: string;
+}
+
 export default function DashboardScreen() {
   const { theme, toggleTheme, isDark } = useTheme();
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNavMenu, setShowNavMenu] = useState(false);
   const [isCheckedIn, setIsCheckedIn] = useState(false);
-  const [membershipDetails, setMembershipDetails] = useState(null);
-  const [personalInfo, setPersonalInfo] = useState(null);
-  const [checkInTime, setCheckInTime] = useState(null);
+  const [membershipDetails, setMembershipDetails] = useState<MembershipDetails | null>(null);
+  const [personalInfo, setPersonalInfo] = useState<PersonalInfo | null>(null);
+  const [checkInTime, setCheckInTime] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
+  const [barcode, setBarcode] = useState<string | null>(null);
+  const [barcodeLoading, setBarcodeLoading] = useState(false);
   const router = useRouter();
 
+  const API_BASE_URL = 'https://api.apithlete.webgeon.com/api';
+
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    if (token) {
+      loadDashboardData();
+    }
+  }, [token]);
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      // Load membership details and personal info from backend
-      // For now using mock data - replace with actual API calls
-      setMembershipDetails({
-        status: 'Active',
-        membershipID: user?.membershipID || 'GYM001',
-        plan: 'Annual Premium Plan',
-        paymentStatus: 'Completed',
-        expiryDate: '2024-12-31',
-        joinDate: '2024-01-01'
+      
+      // Fetch profile data
+      const profileResponse = await fetch(`${API_BASE_URL}/auth/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
+      if (!profileResponse.ok) {
+        throw new Error(`Profile error: ${profileResponse.status}`);
+      }
+
+      const responseData= await profileResponse.json();
+      const profileData = responseData.user;
+      
+      // Set personal info from profile data - Fixed the property names here
       setPersonalInfo({
-        age: 25,
-        gender: 'Male',
-        phoneNumber: user?.phone_number || '+91 9876543210',
-        address: '123 Fitness Street, Gym City, State 123456',
-        emergencyContact: '+91 9876543211',
-        healthCondition: 'Normal'
+        age: profileData.age?.toString() || 'N/A',
+        gender: profileData.gender || 'N/A',
+        phone_number: profileData.phone_number || 'N/A',
+        address: profileData.address || 'N/A',
+        emergency_contact: profileData.emergency_contact || 'N/A',
+        health_condition: profileData.health_condition || 'N/A'
       });
 
-      // Check if user is currently checked in
-      // This should come from backend
-      setIsCheckedIn(false);
-    } catch (error) {
+      // Set membership details from profile data
+      setMembershipDetails({
+        status: profileData.membership_status ||user?.membership_status || 'Inactive',
+        membershipID: profileData.membershipID || user?.membershipID || 'N/A', // Added fallback to user.membershipID
+        plan: profileData.membership_plan || 'N/A',
+        paymentStatus: profileData.payment_status || 'Pending',
+        expiryDate: profileData.renewal_date ? new Date(profileData.renewal_date).toLocaleDateString() : 'N/A',
+        joinDate: profileData.payment_date ? new Date(profileData.payment_date).toLocaleDateString() : 'N/A'
+      });
+
+    } catch (error: any) {
       console.error('Error loading dashboard data:', error);
+      Alert.alert('Error', error.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -69,15 +107,32 @@ export default function DashboardScreen() {
 
   const handleCheckIn = async () => {
     try {
+      if (!token || !user?.membershipID) {
+        Alert.alert('Error', 'Authentication required');
+        return;
+      }
+
       setLoading(true);
-      // API call to check in
-      // await apiService.checkIn(user?.membershipID);
+      const response = await fetch(`${API_BASE_URL}/attendance/checkin/${user.membershipID}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to check in');
+      }
+      
+      const responseData = await response.json();
       setIsCheckedIn(true);
       setCheckInTime(new Date());
-      Alert.alert('Success', 'Checked in successfully!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to check in. Please try again.');
+      Alert.alert('Success', responseData.message || 'Checked in successfully!');
+    } catch (error: any) {
+      console.error('Check-in error:', error);
+      Alert.alert('Error', error.message || 'Failed to check in. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -85,17 +140,63 @@ export default function DashboardScreen() {
 
   const handleCheckOut = async () => {
     try {
+      if (!token || !user?.membershipID) {
+        Alert.alert('Error', 'Authentication required');
+        return;
+      }
+
       setLoading(true);
-      // API call to check out
-      // await apiService.checkOut(user?.membershipID);
+      const response = await fetch(`${API_BASE_URL}/attendance/checkout/${user.membershipID}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to check out');
+      }
+      
+      const responseData = await response.json();
       setIsCheckedIn(false);
       setCheckInTime(null);
-      Alert.alert('Success', 'Checked out successfully!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to check out. Please try again.');
+      Alert.alert('Success', responseData.message || 'Checked out successfully!');
+    } catch (error: any) {
+      console.error('Check-out error:', error);
+      Alert.alert('Error', error.message || 'Failed to check out. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateBarcode = async () => {
+    try {
+      if (!token || !user?.membershipID) {
+        Alert.alert('Error', 'Authentication required');
+        return;
+      }
+
+      setBarcodeLoading(true);
+      const response = await fetch(`${API_BASE_URL}/payment/admin/generate-barcode/${user.membershipID}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to generate barcode');
+      }
+      
+      const responseData = await response.json();
+      setBarcode(responseData.barcode);
+    } catch (error: any) {
+      console.error('Barcode generation error:', error);
+      Alert.alert('Error', error.message || 'Failed to generate barcode');
+    } finally {
+      setBarcodeLoading(false);
     }
   };
 
@@ -132,6 +233,13 @@ export default function DashboardScreen() {
       icon: isCheckedIn ? UserX : UserCheck, 
       action: isCheckedIn ? handleCheckOut : handleCheckIn,
       color: isCheckedIn ? '#EF4444' : '#22C55E'
+    },
+    { 
+      title: 'Generate Barcode', 
+      icon: Shield, 
+      action: generateBarcode,
+      color: '#3B82F6',
+      loading: barcodeLoading
     },
     { title: 'Payment History', icon: CreditCard, route: '/(tabs)/payments', color: '#F59E0B' },
     { title: 'My Trainer', icon: Users, route: '/(tabs)/trainer', color: '#8B5CF6' },
@@ -510,6 +618,28 @@ export default function DashboardScreen() {
             </View>
           </View>
 
+          {/* Barcode Display */}
+          {barcode && (
+            <View style={styles.membershipCard}>
+              <Text style={[styles.membershipLabel, { textAlign: 'center', marginBottom: 8 }]}>
+                Your Membership Barcode
+              </Text>
+              <Text style={[styles.membershipValue, { 
+                textAlign: 'center',
+                fontSize: 12,
+                fontFamily: 'monospace',
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                padding: 8,
+                borderRadius: 4
+              }]}>
+                {barcode}
+              </Text>
+              <Text style={[styles.checkInTime, { textAlign: 'center' }]}>
+                Expires in 2 minutes
+              </Text>
+            </View>
+          )}
+
           {/* Check In/Out Section */}
           <View style={styles.checkInSection}>
             <TouchableOpacity
@@ -517,7 +647,9 @@ export default function DashboardScreen() {
               onPress={isCheckedIn ? handleCheckOut : handleCheckIn}
               disabled={loading}
             >
-              {isCheckedIn ? (
+              {loading ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : isCheckedIn ? (
                 <UserX size={20} color="white" />
               ) : (
                 <UserCheck size={20} color="white" />
@@ -580,7 +712,7 @@ export default function DashboardScreen() {
               <Calendar size={20} color={theme.primary} style={styles.infoIcon} />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Age</Text>
-                <Text style={styles.infoValue}>{personalInfo?.age || 'N/A'} years</Text>
+                <Text style={styles.infoValue}>{personalInfo?.age ? `${personalInfo.age}`: 'N/A'} </Text>
               </View>
             </View>
             
@@ -596,7 +728,7 @@ export default function DashboardScreen() {
               <Phone size={20} color={theme.primary} style={styles.infoIcon} />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Phone Number</Text>
-                <Text style={styles.infoValue}>{personalInfo?.phoneNumber || 'N/A'}</Text>
+                <Text style={styles.infoValue}>{personalInfo?.phone_number || 'N/A' || user?.phone_number}</Text>
               </View>
             </View>
             
@@ -612,7 +744,7 @@ export default function DashboardScreen() {
               <Heart size={20} color={theme.primary} style={styles.infoIcon} />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Health Condition</Text>
-                <Text style={styles.infoValue}>{personalInfo?.healthCondition || 'N/A'}</Text>
+                <Text style={styles.infoValue}>{personalInfo?.health_condition || 'N/A'}</Text>
               </View>
             </View>
           </View>
@@ -626,10 +758,17 @@ export default function DashboardScreen() {
               <TouchableOpacity 
                 key={index}
                 style={styles.actionCard}
-                onPress={() => action.route ? router.push(action.route as any) : action.action?.()}
+                onPress={() => action.route ? router.push(action.route) : action.action?.()}
+                disabled={action.loading}
               >
-                <action.icon size={32} color={action.color} style={styles.actionIcon} />
-                <Text style={styles.actionText}>{action.title}</Text>
+                {action.loading ? (
+                  <ActivityIndicator size="small" color={action.color} />
+                ) : (
+                  <>
+                    <action.icon size={32} color={action.color} style={styles.actionIcon} />
+                    <Text style={styles.actionText}>{action.title}</Text>
+                  </>
+                )}
               </TouchableOpacity>
             ))}
           </View>
@@ -699,7 +838,7 @@ export default function DashboardScreen() {
                 style={styles.menuItem}
                 onPress={() => {
                   setShowNavMenu(false);
-                  router.push(item.route as any);
+                  router.push(item.route);
                 }}
               >
                 <item.icon size={20} color={theme.text} />
