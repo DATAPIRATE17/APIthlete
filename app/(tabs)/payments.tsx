@@ -8,119 +8,176 @@ import {
   Modal,
   Alert,
   Linking,
-  Platform,
+  ActivityIndicator,
+  Image,
+  Share,
 } from 'react-native';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { apiService } from '@/services/api';
-import { CreditCard, Calendar, DollarSign, Filter, Search, CircleCheck as CheckCircle, Circle as XCircle, Clock, Download, FileText, Share, User, Mail } from 'lucide-react-native';
+import { CreditCard, Calendar, DollarSign, Filter, Search, CircleCheck as CheckCircle, Circle as XCircle, Clock, Download, Share as ShareIcon } from 'lucide-react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Print from 'expo-print';
 
-export default function PaymentHistoryScreen() {
+interface Payment {
+  id: string;
+  full_name: string;
+  email: string;
+  amount_paid: string;
+  membership_plan: string;
+  payment_date: string;
+  renewal_date: string;
+  status: string;
+  transactionID: string;
+  invoice_number: string;
+}
+
+interface GymInfo {
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  logo?: {
+    contentType: string;
+    base64: string;
+  };
+}
+
+export default function PaymentHistoryScreen({ navigation }: { navigation: any }) {
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, token, logout } = useAuth();
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('all');
-  const [downloadingInvoice, setDownloadingInvoice] = useState(null);
-  const [payments, setPayments] = useState([]);
+  const [downloadingInvoice, setDownloadingInvoice] = useState<string | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [gymInfo, setGymInfo] = useState<GymInfo | null>(null);
+
+  const API_BASE_URL = 'https://api.apithlete.webgeon.com/api';
 
   useEffect(() => {
-    loadPaymentHistory();
+    const fetchData = async () => {
+      try {
+        await Promise.all([loadPaymentHistory(), loadGymInfo()]);
+      } catch (error) {
+        console.error('Initialization error:', error);
+      }
+    };
+    fetchData();
   }, []);
+
+  const loadGymInfo = async () => {
+    try {
+      if (!token) {
+        throw new Error('Authentication token missing');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/gym/gym-info`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          await handleUnauthorized();
+          return;
+        }
+        throw new Error('Failed to load gym info');
+      }
+      
+      const data = await response.json();
+      setGymInfo(data.gym || null);
+    } catch (error) {
+      console.error('Error loading gym info:', error);
+    }
+  };
 
   const loadPaymentHistory = async () => {
     try {
       setLoading(true);
-      // Mock payment data - replace with actual API call
-      // const response = await apiService.getPaymentHistory(user?.membershipID);
+      setError(null);
       
-      const mockPayments = [
-        {
-          id: '1',
-          fullName: user?.full_name || 'John Doe',
-          email: user?.email || 'john.doe@example.com',
-          amount: '₹12,000',
-          plan: 'Annual Premium Plan',
-          paymentDate: '2024-01-15',
-          renewalDate: '2025-01-15',
-          status: 'Completed',
-          transactionId: 'TXN123456789',
-          invoiceNumber: 'INV-2024-001',
-        },
-        {
-          id: '2',
-          fullName: user?.full_name || 'John Doe',
-          email: user?.email || 'john.doe@example.com',
-          amount: '₹3,000',
-          plan: 'Quarterly Plan',
-          paymentDate: '2023-10-15',
-          renewalDate: '2024-01-15',
-          status: 'Completed',
-          transactionId: 'TXN123456790',
-          invoiceNumber: 'INV-2023-045',
-        },
-        {
-          id: '3',
-          fullName: user?.full_name || 'John Doe',
-          email: user?.email || 'john.doe@example.com',
-          amount: '₹1,000',
-          plan: 'Monthly Plan',
-          paymentDate: '2024-02-01',
-          renewalDate: '2024-03-01',
-          status: 'Pending',
-          transactionId: 'TXN123456791',
-          invoiceNumber: 'INV-2024-012',
-        },
-      ];
+      if (!user?.membershipID) {
+        throw new Error('Membership ID not found');
+      }
+
+      if (!token) {
+        throw new Error('Authentication token missing');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/payment/payment-details/${user.membershipID}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          await handleUnauthorized();
+          return;
+        }
+        throw new Error(`Failed to load payment history: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const paymentsArray = Array.isArray(data) ? data : [data];
       
-      setPayments(mockPayments);
-    } catch (error) {
+      // Validate and normalize payment data
+      const validatedPayments = paymentsArray.map(payment => ({
+        ...payment,
+        status: payment.status?.toLowerCase() || 'pending',
+        amount_paid: payment.amount_paid || '₹0',
+        invoice_number: payment.invoice_number || 'N/A',
+        transactionID: payment.transactionID || 'N/A'
+      }));
+
+      setPayments(validatedPayments);
+    } catch (error: any) {
       console.error('Error loading payment history:', error);
-      Alert.alert('Error', 'Failed to load payment history');
+      setError(error.message || 'Failed to load payment history');
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateRenewalDate = (paymentDate, plan) => {
-    const date = new Date(paymentDate);
-    if (plan.toLowerCase().includes('annual')) {
-      date.setFullYear(date.getFullYear() + 1);
-    } else if (plan.toLowerCase().includes('quarterly')) {
-      date.setMonth(date.getMonth() + 3);
-    } else if (plan.toLowerCase().includes('monthly')) {
-      date.setMonth(date.getMonth() + 1);
-    }
-    return date.toISOString().split('T')[0];
+  const handleUnauthorized = async () => {
+    Alert.alert(
+      'Session Expired',
+      'Your session has expired. Please log in again.',
+      [
+        {
+          text: 'OK',
+          onPress: () => {
+            logout();
+            navigation.navigate('Login');
+          }
+        }
+      ]
+    );
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status = 'pending') => {
     switch (status.toLowerCase()) {
-      case 'completed':
-        return <CheckCircle size={20} color="#22C55E" />;
-      case 'pending':
-        return <Clock size={20} color="#F59E0B" />;
-      case 'failed':
-        return <XCircle size={20} color="#EF4444" />;
-      default:
-        return <Clock size={20} color="#6B7280" />;
+      case 'completed': return <CheckCircle size={20} color="#22C55E" />;
+      case 'pending': return <Clock size={20} color="#F59E0B" />;
+      case 'failed': return <XCircle size={20} color="#EF4444" />;
+      default: return <Clock size={20} color="#6B7280" />;
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status = 'pending') => {
     switch (status.toLowerCase()) {
-      case 'completed':
-        return '#22C55E';
-      case 'pending':
-        return '#F59E0B';
-      case 'failed':
-        return '#EF4444';
-      default:
-        return '#6B7280';
+      case 'completed': return '#22C55E';
+      case 'pending': return '#F59E0B';
+      case 'failed': return '#EF4444';
+      default: return '#6B7280';
     }
   };
 
-  const handleDownloadInvoice = async (payment) => {
+  const handleDownloadInvoice = async (payment: Payment) => {
     if (payment.status.toLowerCase() !== 'completed') {
       Alert.alert('Error', 'Invoice is only available for completed payments');
       return;
@@ -128,28 +185,29 @@ export default function PaymentHistoryScreen() {
 
     setDownloadingInvoice(payment.id);
     try {
-      // Mock PDF generation - replace with actual API call
-      // const pdfBlob = await apiService.downloadInvoice(payment.id);
-      
-      const pdfContent = generateInvoicePDF(payment);
-      
-      if (Platform.OS === 'web') {
-        // Web implementation
-        const blob = new Blob([pdfContent], { type: 'application/pdf' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `invoice-${payment.invoiceNumber}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      } else {
-        // Mobile implementation would use FileSystem
-        Alert.alert('Success', 'Invoice download feature will be implemented for mobile');
-      }
-      
-      Alert.alert('Success', 'Invoice downloaded successfully');
+      const htmlContent = generateInvoiceHTML(payment);
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      const newUri = `${FileSystem.documentDirectory}invoice_${payment.invoice_number}.pdf`;
+      await FileSystem.moveAsync({ from: uri, to: newUri });
+
+      Alert.alert(
+        'Invoice Downloaded',
+        'What would you like to do with the invoice?',
+        [
+          { 
+            text: 'Open', 
+            onPress: () => Linking.openURL(newUri) 
+          },
+          { 
+            text: 'Share', 
+            onPress: () => shareInvoice(newUri) 
+          },
+          { 
+            text: 'Cancel', 
+            style: 'cancel' 
+          },
+        ]
+      );
     } catch (error) {
       console.error('Error downloading invoice:', error);
       Alert.alert('Error', 'Failed to download invoice');
@@ -158,44 +216,139 @@ export default function PaymentHistoryScreen() {
     }
   };
 
-  const generateInvoicePDF = (payment) => {
-    // Mock PDF content - in real app, this would be generated by backend
-    return `
-      INVOICE
-      
-      Invoice Number: ${payment.invoiceNumber}
-      Date: ${payment.paymentDate}
-      
-      Bill To:
-      ${payment.fullName}
-      ${payment.email}
-      
-      Description: ${payment.plan}
-      Amount: ${payment.amount}
-      Payment Date: ${payment.paymentDate}
-      Renewal Date: ${payment.renewalDate}
-      Transaction ID: ${payment.transactionId}
-      Status: ${payment.status}
-      
-      Thank you for your payment!
-    `;
-  };
-
-  const handleShareInvoice = async (payment) => {
+  const shareInvoice = async (fileUri: string) => {
     try {
-      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.share) {
-        await navigator.share({
-          title: `Invoice ${payment.invoiceNumber}`,
-          text: `Payment invoice for ${payment.plan} - ${payment.amount}`,
-          url: window.location.href,
-        });
-      } else {
-        // Fallback for browsers that don't support Web Share API or mobile
-        Alert.alert('Share', 'Invoice sharing feature will be implemented');
-      }
+      await Share.share({
+        url: fileUri,
+        title: 'Invoice',
+        message: 'Here is your invoice PDF',
+      });
     } catch (error) {
       console.error('Error sharing invoice:', error);
+      Alert.alert('Error', 'Failed to share invoice');
     }
+  };
+
+  const handleShareInvoice = async (payment: Payment) => {
+    try {
+      if (payment.status.toLowerCase() !== 'completed') {
+        Alert.alert('Error', 'Only completed payments can be shared');
+        return;
+      }
+
+      const htmlContent = generateInvoiceHTML(payment);
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      await shareInvoice(uri);
+    } catch (error) {
+      console.error('Error sharing invoice:', error);
+      Alert.alert('Error', 'Failed to share invoice');
+    }
+  };
+
+  const generateInvoiceHTML = (payment: Payment) => {
+    const logoData = gymInfo?.logo ? `data:${gymInfo.logo.contentType};base64,${gymInfo.logo.base64}` : '';
+    const safeStatus = payment.status?.toLowerCase() || 'pending';
+    
+    return `
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+            .gym-info { margin-bottom: 15px; }
+            .gym-logo { max-width: 150px; max-height: 80px; margin-bottom: 10px; }
+            .gym-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+            .gym-contact { font-size: 12px; color: #666; margin-bottom: 2px; }
+            .title { font-size: 24px; font-weight: bold; margin-bottom: 20px; text-align: center; }
+            .subtitle { font-size: 14px; margin-bottom: 5px; color: #666; text-align: center; }
+            .info-container { display: flex; justify-content: space-between; margin-bottom: 20px; }
+            .info-column { width: 48%; }
+            .info-title { font-size: 12px; color: #999; margin-bottom: 3px; }
+            .info-text { font-size: 14px; margin-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th, td { padding: 8px; text-align: left; border-bottom: 1px solid #eee; }
+            th { background-color: #f5f5f5; font-weight: bold; }
+            .total-row { display: flex; justify-content: flex-end; margin-top: 20px; }
+            .total-text { font-size: 14px; font-weight: bold; margin-right: 10px; }
+            .total-amount { font-size: 14px; font-weight: bold; }
+            .status { 
+              display: inline-block; 
+              padding: 5px; 
+              border-radius: 5px; 
+              font-size: 14px; 
+              margin-bottom: 10px;
+            }
+            .completed { background-color: #E6F7E6; color: #2E7D32; }
+            .pending { background-color: #FFF8E1; color: #F57F17; }
+            .footer { text-align: center; font-size: 10px; color: #999; margin-top: 30px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="gym-info">
+                ${logoData ? `<img src="${logoData}" class="gym-logo" alt="Gym Logo" />` : ''}
+                <div class="gym-name">${gymInfo?.name || 'Your Gym Name'}</div>
+                <div class="gym-contact">${gymInfo?.address || '123 Gym Street, Fitness City'}</div>
+                <div class="gym-contact">Phone: ${gymInfo?.phone || '(123) 456-7890'}</div>
+                <div class="gym-contact">Email: ${gymInfo?.email || 'info@yourgym.com'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="title">PAYMENT RECEIPT</div>
+            <div class="subtitle">Invoice #${payment.invoice_number}</div>
+            <div class="subtitle">Date: ${new Date(payment.payment_date).toLocaleDateString()}</div>
+          </div>
+
+          <div class="info-container">
+            <div class="info-column">
+              <div class="info-title">BILLED TO:</div>
+              <div class="info-text">${payment.full_name}</div>
+              <div class="info-text">${payment.email}</div>
+              <div class="info-text">Membership ID: ${user?.membershipID}</div>
+            </div>
+            <div class="info-column">
+              <div class="info-title">PAYMENT DETAILS:</div>
+              <div class="info-text">Transaction ID: ${payment.transactionID}</div>
+              <div class="info-text">Status: ${payment.status}</div>
+              <div class="status ${safeStatus}">${payment.status.toUpperCase()}</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>DESCRIPTION</th>
+                <th>MEMBERSHIP PERIOD</th>
+                <th>AMOUNT</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>${payment.membership_plan} Membership</td>
+                <td>
+                  ${new Date(payment.payment_date).toLocaleDateString()} - 
+                  ${new Date(payment.renewal_date).toLocaleDateString()}
+                </td>
+                <td>${payment.amount_paid}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="total-row">
+            <div class="total-text">TOTAL:</div>
+            <div class="total-amount">${payment.amount_paid}</div>
+          </div>
+
+          <div class="footer">
+            <div>Thank you for choosing ${gymInfo?.name || 'Your Gym'}</div>
+            <div>© ${new Date().getFullYear()} ${gymInfo?.name || 'Your Gym'}. All rights reserved.</div>
+          </div>
+        </body>
+      </html>
+    `;
   };
 
   const filteredPayments = payments.filter(payment => {
@@ -205,13 +358,12 @@ export default function PaymentHistoryScreen() {
 
   const totalAmount = payments
     .filter(p => p.status.toLowerCase() === 'completed')
-    .reduce((sum, p) => sum + parseInt(p.amount.replace('₹', '').replace(',', '')), 0);
+    .reduce((sum, p) => sum + parseFloat(p.amount_paid.replace(/[^0-9.]/g, '')), 0);
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.background,
-      paddingBottom: 100,
     },
     header: {
       backgroundColor: theme.surface,
@@ -445,35 +597,84 @@ export default function PaymentHistoryScreen() {
       textAlign: 'center',
       fontSize: 16,
     },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    errorContainer: {
+      backgroundColor: theme.error + '20',
+      padding: 16,
+      borderRadius: 8,
+      margin: 20,
+      borderWidth: 1,
+      borderColor: theme.error,
+    },
+    errorText: {
+      color: theme.error,
+      textAlign: 'center',
+    },
+    retryButton: {
+      color: theme.primary,
+      textAlign: 'center',
+      marginTop: 10,
+      fontWeight: '600',
+    },
   });
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>
+          {error.includes('401') ? 'Session expired. Please log in again.' : error}
+        </Text>
+        {error.includes('401') ? (
+          <TouchableOpacity onPress={() => {
+            logout();
+            navigation.navigate('Login');
+          }}>
+            <Text style={styles.retryButton}>Go to Login</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={loadPaymentHistory}>
+            <Text style={styles.retryButton}>Retry</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Payment History</Text>
         <Text style={styles.headerSubtitle}>Track all your membership payments</Text>
       </View>
 
-      {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Stats */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>₹{totalAmount.toLocaleString()}</Text>
             <Text style={styles.statLabel}>Total Paid</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{payments.filter(p => p.status.toLowerCase() === 'completed').length}</Text>
+            <Text style={styles.statValue}>{payments.filter(p => p.status === 'completed').length}</Text>
             <Text style={styles.statLabel}>Completed</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{payments.filter(p => p.status.toLowerCase() === 'pending').length}</Text>
+            <Text style={styles.statValue}>{payments.filter(p => p.status === 'pending').length}</Text>
             <Text style={styles.statLabel}>Pending</Text>
           </View>
         </View>
 
-        {/* Filters */}
         <View style={styles.filtersContainer}>
           <TouchableOpacity
             style={styles.filterButton}
@@ -490,31 +691,34 @@ export default function PaymentHistoryScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Payment List */}
         {filteredPayments.map((payment) => (
           <View key={payment.id} style={styles.paymentCard}>
             <View style={styles.paymentHeader}>
               <View style={styles.paymentInfo}>
-                <Text style={styles.memberName}>{payment.fullName}</Text>
+                <Text style={styles.memberName}>{payment.full_name}</Text>
                 <Text style={styles.memberEmail}>{payment.email}</Text>
               </View>
-              <Text style={styles.paymentAmount}>{payment.amount}</Text>
+              <Text style={styles.paymentAmount}>{payment.amount_paid}</Text>
             </View>
             
             <View style={styles.paymentDetails}>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Plan</Text>
-                <Text style={styles.detailValue}>{payment.plan}</Text>
+                <Text style={styles.detailValue}>{payment.membership_plan}</Text>
               </View>
               
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Payment Date</Text>
-                <Text style={styles.detailValue}>{payment.paymentDate}</Text>
+                <Text style={styles.detailValue}>
+                  {new Date(payment.payment_date).toLocaleDateString()}
+                </Text>
               </View>
               
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Renewal Date</Text>
-                <Text style={styles.detailValue}>{payment.renewalDate}</Text>
+                <Text style={styles.detailValue}>
+                  {new Date(payment.renewal_date).toLocaleDateString()}
+                </Text>
               </View>
               
               <View style={styles.detailRow}>
@@ -528,43 +732,46 @@ export default function PaymentHistoryScreen() {
               </View>
             </View>
 
-            {/* Invoice Actions */}
             <View style={styles.invoiceActions}>
               <View style={styles.invoiceInfo}>
-                <Text style={styles.invoiceNumber}>Invoice: {payment.invoiceNumber}</Text>
-                <Text style={styles.transactionId}>TXN: {payment.transactionId}</Text>
+                <Text style={styles.invoiceNumber}>Invoice: {payment.invoice_number}</Text>
+                <Text style={styles.transactionId}>TXN: {payment.transactionID}</Text>
               </View>
               
               <View style={styles.actionButtons}>
                 <TouchableOpacity
                   style={[
                     styles.actionButton,
-                    payment.status.toLowerCase() !== 'completed' && styles.actionButtonDisabled
+                    payment.status !== 'completed' && styles.actionButtonDisabled
                   ]}
                   onPress={() => handleDownloadInvoice(payment)}
-                  disabled={payment.status.toLowerCase() !== 'completed' || downloadingInvoice === payment.id}
+                  disabled={payment.status !== 'completed' || downloadingInvoice === payment.id}
                 >
-                  <Download size={12} color={payment.status.toLowerCase() === 'completed' ? theme.primary : theme.textSecondary} />
+                  {downloadingInvoice === payment.id ? (
+                    <ActivityIndicator size="small" color={theme.primary} />
+                  ) : (
+                    <Download size={12} color={payment.status === 'completed' ? theme.primary : theme.textSecondary} />
+                  )}
                   <Text style={[
                     styles.actionButtonText,
-                    payment.status.toLowerCase() !== 'completed' && styles.actionButtonTextDisabled
+                    payment.status !== 'completed' && styles.actionButtonTextDisabled
                   ]}>
-                    {downloadingInvoice === payment.id ? 'Downloading...' : 'PDF'}
+                    PDF
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[
                     styles.actionButton,
-                    payment.status.toLowerCase() !== 'completed' && styles.actionButtonDisabled
+                    payment.status !== 'completed' && styles.actionButtonDisabled
                   ]}
                   onPress={() => handleShareInvoice(payment)}
-                  disabled={payment.status.toLowerCase() !== 'completed'}
+                  disabled={payment.status !== 'completed'}
                 >
-                  <Share size={12} color={payment.status.toLowerCase() === 'completed' ? theme.primary : theme.textSecondary} />
+                  <ShareIcon size={12} color={payment.status === 'completed' ? theme.primary : theme.textSecondary} />
                   <Text style={[
                     styles.actionButtonText,
-                    payment.status.toLowerCase() !== 'completed' && styles.actionButtonTextDisabled
+                    payment.status !== 'completed' && styles.actionButtonTextDisabled
                   ]}>
                     Share
                   </Text>
@@ -575,7 +782,6 @@ export default function PaymentHistoryScreen() {
         ))}
       </ScrollView>
 
-      {/* Filter Modal */}
       <Modal
         visible={showFilterModal}
         transparent
