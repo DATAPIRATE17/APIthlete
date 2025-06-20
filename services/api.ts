@@ -38,6 +38,12 @@ export interface UserProfile {
   pincode?: string;
   membershipID: string;
   passport_photo?: string;
+  emergency_contact?: string;
+  identity_type?: string;
+  identity_number?: string;
+  date_of_birth?: string;
+  availability?: string;
+  trainer_name?: string;
 }
 
 export interface UpdateProfileRequest {
@@ -50,6 +56,13 @@ export interface UpdateProfileRequest {
   address?: string;
   pincode?: string;
   emergency_contact?: string;
+  identity_type?: string;
+  identity_number?: string;
+  date_of_birth?: string;
+  availability?: string;
+  trainer_name?: string;
+  passport_photo?: string;
+  photo_mime_type?: string;
 }
 
 export interface CheckInOutRequest {
@@ -75,17 +88,21 @@ export interface PersonalInfo {
   healthCondition: string;
 }
 
-export interface PaymentHistory {
+export interface Payment {
   id: string;
-  fullName: string;
+  full_name: string;
   email: string;
-  amount: string;
-  plan: string;
-  paymentDate: string;
-  renewalDate: string;
+  amount_paid: string;
+  membership_plan: string;
+  payment_date: string;
+  renewal_date: string;
   status: string;
-  transactionId: string;
-  invoiceNumber: string;
+  transactionID: string;
+  invoice_number: string;
+}
+
+export interface PaymentHistoryResponse {
+  payments: Payment[];
 }
 
 export interface TrainerInfo {
@@ -122,6 +139,99 @@ export interface MembershipPlan {
   perks?: string[];
 }
 
+export interface PaymentInitiationResponse {
+  success: boolean;
+  checkoutUrl?: string;
+  orderId?: string;
+  error?: string;
+}
+
+export interface PaymentStatusResponse {
+  success: boolean;
+  status: string;
+  data: any;
+}
+
+export interface PaymentDetails {
+  membership_plan: string;
+  payment_status: string;
+  amount_paid: number;
+  payment_date: string;
+  renewal_date: string;
+  transactionID: string;
+  membership_status: string;
+}
+
+export interface BarcodeResponse {
+  success: boolean;
+  barcode: string;
+  expiresInMinutes: number;
+}
+
+export interface BarcodeVerificationResponse {
+  success: boolean;
+  message: string;
+  member?: any;
+  loginTime?: string;
+  logoutTime?: string;
+  hoursWorked?: number;
+}
+
+export interface AttendanceRecord {
+  membershipID: string;
+  fullName: string;
+  date: string;
+  loginTime: string;
+  logoutTime?: string;
+  hoursWorked?: number;
+}
+
+export interface IdentityDocumentResponse {
+  document: string; // base64 encoded
+  mimeType: string;
+}
+
+export interface RegistrationFormData {
+  full_name: string;
+  email: string;
+  phone_number: string;
+  age: string;
+  date_of_birth: string;
+  gender: string;
+  emergency_contact: string;
+  address: string;
+  pincode: string;
+  availability: string;
+  identity_type: string;
+  identity_number: string;
+  health_condition: string;
+  trainer_name?: string;
+  passport_photo?: any;
+  identity_document?: any;
+}
+
+export interface TrainerResponse {
+  trainerID: string;
+  trainer_name: string;
+  specialization: string;
+  phone_number: string;
+  assigned_Members: number;
+  availability: string[];
+  passport_photo?: string;
+  photo_mime_type?: string;
+}
+
+export interface GymInfo {
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  logo?: {
+    contentType: string;
+    base64: string;
+  };
+}
+
 class ApiService {
   private baseURL = API_BASE_URL;
   private token: string | null = null;
@@ -144,19 +254,13 @@ class ApiService {
       headers.Authorization = `Bearer ${this.token}`;
     }
 
-    console.log('Making request to:', url);
-    console.log('Request options:', { ...options, headers });
-
     const response = await fetch(url, {
       ...options,
       headers,
     });
 
-    console.log('Response status:', response.status);
-
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('API Error:', errorData);
       throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
     }
 
@@ -186,9 +290,9 @@ class ApiService {
   async updateProfile(
     membershipID: string,
     data: UpdateProfileRequest
-  ): Promise<{ message: string; member: UserProfile }> {
-    return this.request<{ message: string; member: UserProfile }>(
-      `/api/member/edit/${membershipID}`,
+  ): Promise<{ message: string; user: UserProfile }> {
+    return this.request<{ message: string; user: UserProfile }>(
+      `/api/auth/edit/${membershipID}`,
       {
         method: 'PUT',
         body: JSON.stringify(data),
@@ -197,12 +301,25 @@ class ApiService {
   }
 
   // Profile Picture Upload
-  async uploadProfilePicture(membershipID: string, imageFile: FormData): Promise<any> {
-    const url = `${this.baseURL}/api/member/upload-photo/${membershipID}`;
-    
+  async uploadProfilePicture(
+    membershipID: string,
+    imageData: { passport_photo: string; photo_mime_type: string }
+  ): Promise<{ message: string; photoUrl: string }> {
+    return this.request<{ message: string; photoUrl: string }>(
+      `/api/auth/edit/${membershipID}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(imageData),
+      }
+    );
+  }
+
+  // Registration
+  async registerUser(formData: FormData): Promise<LoginResponse> {
+    const url = `${this.baseURL}/api/auth/register`;
     const response = await fetch(url, {
       method: 'POST',
-      body: imageFile,
+      body: formData,
       headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
     });
 
@@ -214,33 +331,16 @@ class ApiService {
     return response.json();
   }
 
-  // Registration
-  async registerUser(formData: FormData): Promise<LoginResponse> {
-    return fetch(`${this.baseURL}/api/auth/register`, {
-      method: 'POST',
-      body: formData,
-      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
-    }).then(async (response) => {
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
-      }
-      return response.json();
-    });
-  }
-
   // Check In/Out
-  async checkIn(membershipID: string): Promise<{ message: string }> {
-    return this.request<{ message: string }>('/api/attendance/checkin', {
+  async checkIn(membershipID: string): Promise<{ message: string; attendance: AttendanceRecord }> {
+    return this.request<{ message: string; attendance: AttendanceRecord }>(`/api/attendance/checkin/${membershipID}`, {
       method: 'POST',
-      body: JSON.stringify({ membershipID, action: 'checkin' }),
     });
   }
 
-  async checkOut(membershipID: string): Promise<{ message: string }> {
-    return this.request<{ message: string }>('/api/attendance/checkout', {
+  async checkOut(membershipID: string): Promise<{ message: string; attendance: AttendanceRecord }> {
+    return this.request<{ message: string; attendance: AttendanceRecord }>(`/api/attendance/checkout/${membershipID}`, {
       method: 'POST',
-      body: JSON.stringify({ membershipID, action: 'checkout' }),
     });
   }
 
@@ -260,26 +360,28 @@ class ApiService {
   }
 
   // Payment History
-  async getPaymentHistory(membershipID: string): Promise<{ payments: PaymentHistory[] }> {
-    return this.request<{ payments: PaymentHistory[] }>(`/api/payment/history/${membershipID}`);
+  async getPaymentHistory(membershipID: string): Promise<PaymentHistoryResponse> {
+    return this.request<PaymentHistoryResponse>(`/api/payment/payment-details/${membershipID}`);
   }
 
-  async downloadInvoice(paymentId: string): Promise<Blob> {
-    const response = await fetch(`${this.baseURL}/api/payment/invoice/${paymentId}`, {
-      method: 'GET',
-      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to download invoice');
-    }
-
-    return response.blob();
+  // Gym Information
+  async getGymInfo(): Promise<{ gym: GymInfo }> {
+    return this.request<{ gym: GymInfo }>('/api/gym/gym-info');
   }
 
   // Trainer Information
-  async getAssignedTrainer(membershipID: string): Promise<{ trainer: TrainerInfo | null }> {
-    return this.request<{ trainer: TrainerInfo | null }>(`/api/member/trainer/${membershipID}`);
+  async getAssignedTrainer(membershipID: string): Promise<{ trainer: TrainerResponse | null }> {
+    return this.request<{ trainer: TrainerResponse | null }>(`/api/admin/trainers/${membershipID}`);
+  }
+
+  // Get Trainer Passport Photo
+  async getTrainerPassportPhoto(trainerID: string): Promise<{ photo: string }> {
+    return this.request<{ photo: string }>(`/api/admin/trainer/passport-photo/${trainerID}`);
+  }
+
+  // Get Assigned Members for Trainer
+  async getTrainerAssignedMembers(trainerID: string): Promise<{ assigned_members: any[] }> {
+    return this.request<{ assigned_members: any[] }>(`/api/trainer/assigned-members/${trainerID}`);
   }
 
   // Membership Plans
@@ -287,16 +389,441 @@ class ApiService {
     return this.request<{ plans: MembershipPlan[] }>('/api/membership/plans');
   }
 
-  // Notifications
-  async getNotifications(membershipID: string): Promise<{ notifications: any[] }> {
-    return this.request<{ notifications: any[] }>(`/api/notifications/${membershipID}`);
+  // Identity Document
+  async getIdentityDocument(membershipID: string): Promise<IdentityDocumentResponse> {
+    return this.request<IdentityDocumentResponse>(`/api/member/identity-document/${membershipID}`);
   }
 
-  async markNotificationAsRead(notificationId: string): Promise<{ message: string }> {
-    return this.request<{ message: string }>(`/api/notifications/read/${notificationId}`, {
-      method: 'PUT',
+  // OTP-less Login
+  async handleOTPlessLogin(data: { email?: string; phone_number?: string }): Promise<LoginResponse> {
+    return this.request<LoginResponse>('/api/auth/handlelogin', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
+  }
+
+  // Passport Photo
+  async getPassportPhoto(membershipID: string): Promise<{ photo: string }> {
+    return this.request<{ photo: string }>(`/api/member/passport-photo/${membershipID}`);
+  }
+
+  // Get All Trainers
+  async getAllTrainers(): Promise<{ trainers: TrainerResponse[] }> {
+    return this.request<{ trainers: TrainerResponse[] }>('/api/trainers');
+  }
+
+  // Get Trainer by ID
+  async getTrainerById(trainerID: string): Promise<{ trainer: TrainerResponse }> {
+    return this.request<{ trainer: TrainerResponse }>(`/api/trainers/${trainerID}`);
   }
 }
 
 export const apiService = new ApiService();
+
+
+
+
+
+// const API_BASE_URL = 'https://api.apithlete.webgeon.com';
+
+// export interface SendOTPRequest {
+//   phone: string;
+// }
+
+// export interface VerifyOTPRequest {
+//   sessionId: string;
+//   otp: string;
+// }
+
+// export interface LoginResponse {
+//   message: string;
+//   token?: string;
+//   user?: {
+//     _id: string;
+//     email: string;
+//     full_name: string;
+//     membershipID: string;
+//     phone_number: string;
+//     passport_photo_url?: string;
+//   };
+//   newUser?: boolean;
+//   identifier?: string;
+//   isEmail?: boolean;
+//   sessionId?: string;
+// }
+
+// export interface UserProfile {
+//   _id: string;
+//   full_name: string;
+//   email: string;
+//   phone_number: string;
+//   age?: number;
+//   gender?: string;
+//   health_condition?: string;
+//   address?: string;
+//   pincode?: string;
+//   membershipID: string;
+//   passport_photo?: string;
+//   emergency_contact?: string;
+//   identity_type?: string;
+//   identity_number?: string;
+//   date_of_birth?: string;
+//   availability?: string;
+//   trainer_name?: string;
+// }
+
+// export interface UpdateProfileRequest {
+//   full_name?: string;
+//   email?: string;
+//   phone_number?: string;
+//   age?: number;
+//   gender?: string;
+//   health_condition?: string;
+//   address?: string;
+//   pincode?: string;
+//   emergency_contact?: string;
+//   identity_type?: string;
+//   identity_number?: string;
+//   date_of_birth?: string;
+//   availability?: string;
+//   trainer_name?: string;
+// }
+
+// export interface CheckInOutRequest {
+//   membershipID: string;
+//   action: 'checkin' | 'checkout';
+// }
+
+// export interface MembershipDetails {
+//   status: string;
+//   membershipID: string;
+//   plan: string;
+//   paymentStatus: string;
+//   expiryDate: string;
+//   joinDate: string;
+// }
+
+// export interface PersonalInfo {
+//   age: number;
+//   gender: string;
+//   phoneNumber: string;
+//   address: string;
+//   emergencyContact: string;
+//   healthCondition: string;
+// }
+
+// export interface PaymentHistory {
+//   id: string;
+//   fullName: string;
+//   email: string;
+//   amount: string;
+//   plan: string;
+//   paymentDate: string;
+//   renewalDate: string;
+//   status: string;
+//   transactionId: string;
+//   invoiceNumber: string;
+// }
+
+// export interface TrainerInfo {
+//   id: string;
+//   name: string;
+//   trainerId: string;
+//   specialization: string;
+//   experience: string;
+//   rating: number;
+//   image: string;
+//   bio: string;
+//   phone: string;
+//   email: string;
+//   availability: string;
+//   isAvailable: boolean;
+//   weeklySchedule: Record<string, string>;
+//   assignedCustomers: number;
+//   achievements: string[];
+//   assignedDate: string;
+//   nextSession?: string;
+// }
+
+// export interface MembershipPlan {
+//   id: string;
+//   name: string;
+//   price: string;
+//   originalPrice?: string;
+//   duration: string;
+//   icon: any;
+//   color: string;
+//   popular: boolean;
+//   savings?: string;
+//   features: string[];
+//   perks?: string[];
+// }
+
+// export interface PaymentInitiationResponse {
+//   success: boolean;
+//   checkoutUrl?: string;
+//   orderId?: string;
+//   error?: string;
+// }
+
+// export interface PaymentStatusResponse {
+//   success: boolean;
+//   status: string;
+//   data: any;
+// }
+
+// export interface PaymentDetails {
+//   membership_plan: string;
+//   payment_status: string;
+//   amount_paid: number;
+//   payment_date: string;
+//   renewal_date: string;
+//   transactionID: string;
+//   membership_status: string;
+// }
+
+// export interface BarcodeResponse {
+//   success: boolean;
+//   barcode: string;
+//   expiresInMinutes: number;
+// }
+
+// export interface BarcodeVerificationResponse {
+//   success: boolean;
+//   message: string;
+//   member?: any;
+//   loginTime?: string;
+//   logoutTime?: string;
+//   hoursWorked?: number;
+// }
+
+// export interface AttendanceRecord {
+//   membershipID: string;
+//   fullName: string;
+//   date: string;
+//   loginTime: string;
+//   logoutTime?: string;
+//   hoursWorked?: number;
+// }
+
+// export interface IdentityDocumentResponse {
+//   document: string; // base64 encoded
+//   mimeType: string;
+// }
+
+// export interface RegistrationFormData {
+//   full_name: string;
+//   email: string;
+//   phone_number: string;
+//   age: string;
+//   date_of_birth: string;
+//   gender: string;
+//   emergency_contact: string;
+//   address: string;
+//   pincode: string;
+//   availability: string;
+//   identity_type: string;
+//   identity_number: string;
+//   health_condition: string;
+//   trainer_name?: string;
+//   passport_photo?: any;
+//   identity_document?: any;
+// }
+
+// export interface TrainerResponse {
+//   trainerID: string;
+//   trainer_name: string;
+//   specialization: string;
+//   phone_number: string;
+//   assigned_Members: number;
+//   availability: string[];
+//   passport_photo?: string;
+//   photo_mime_type?: string;
+// }
+
+// class ApiService {
+//   private baseURL = API_BASE_URL;
+//   private token: string | null = null;
+
+//   setToken(token: string) {
+//     this.token = token;
+//   }
+
+//   private async request<T>(
+//     endpoint: string,
+//     options: RequestInit = {}
+//   ): Promise<T> {
+//     const url = `${this.baseURL}${endpoint}`;
+//     const headers: HeadersInit = {
+//       'Content-Type': 'application/json',
+//       ...options.headers,
+//     };
+
+//     if (this.token) {
+//       headers.Authorization = `Bearer ${this.token}`;
+//     }
+
+//     const response = await fetch(url, {
+//       ...options,
+//       headers,
+//     });
+
+//     if (!response.ok) {
+//       const errorData = await response.json().catch(() => ({}));
+//       throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
+//     }
+
+//     return response.json();
+//   }
+
+//   // OTP Authentication
+//   async sendOTP(data: SendOTPRequest): Promise<{ message: string; sessionId: string }> {
+//     return this.request<{ message: string; sessionId: string }>('/api/otp/send-otp', {
+//       method: 'POST',
+//       body: JSON.stringify(data),
+//     });
+//   }
+
+//   async verifyOTP(data: VerifyOTPRequest): Promise<LoginResponse> {
+//     return this.request<LoginResponse>('/api/otp/verify-otp', {
+//       method: 'POST',
+//       body: JSON.stringify(data),
+//     });
+//   }
+
+//   // User Profile
+//   async getUserProfile(): Promise<{ user: UserProfile }> {
+//     return this.request<{ user: UserProfile }>('/api/auth/profile');
+//   }
+
+//   async updateProfile(
+//     membershipID: string,
+//     data: UpdateProfileRequest
+//   ): Promise<{ message: string; member: UserProfile }> {
+//     return this.request<{ message: string; member: UserProfile }>(
+//       `/api/member/edit/${membershipID}`,
+//       {
+//         method: 'PUT',
+//         body: JSON.stringify(data),
+//       }
+//     );
+//   }
+
+//   // Registration
+//   async registerUser(formData: FormData): Promise<LoginResponse> {
+//     const url = `${this.baseURL}/api/auth/register`;
+//     const response = await fetch(url, {
+//       method: 'POST',
+//       body: formData,
+//       headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+//     });
+
+//     if (!response.ok) {
+//       const errorData = await response.json().catch(() => ({}));
+//       throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
+//     }
+
+//     return response.json();
+//   }
+
+//   // Profile Picture Upload
+//   async uploadProfilePicture(membershipID: string, imageFile: FormData): Promise<{ message: string; photoUrl: string }> {
+//     const url = `${this.baseURL}/api/member/upload-photo/${membershipID}`;
+    
+//     const response = await fetch(url, {
+//       method: 'POST',
+//       body: imageFile,
+//       headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+//     });
+
+//     if (!response.ok) {
+//       const errorData = await response.json().catch(() => ({}));
+//       throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
+//     }
+
+//     return response.json();
+//   }
+
+//   // Check In/Out
+//   async checkIn(membershipID: string): Promise<{ message: string; attendance: AttendanceRecord }> {
+//     return this.request<{ message: string; attendance: AttendanceRecord }>(`/api/attendance/checkin/${membershipID}`, {
+//       method: 'POST',
+//     });
+//   }
+
+//   async checkOut(membershipID: string): Promise<{ message: string; attendance: AttendanceRecord }> {
+//     return this.request<{ message: string; attendance: AttendanceRecord }>(`/api/attendance/checkout/${membershipID}`, {
+//       method: 'POST',
+//     });
+//   }
+
+//   // Dashboard Data
+//   async getDashboardData(membershipID: string): Promise<{
+//     membershipDetails: MembershipDetails;
+//     personalInfo: PersonalInfo;
+//     isCheckedIn: boolean;
+//     checkInTime?: string;
+//   }> {
+//     return this.request<{
+//       membershipDetails: MembershipDetails;
+//       personalInfo: PersonalInfo;
+//       isCheckedIn: boolean;
+//       checkInTime?: string;
+//     }>(`/api/dashboard/member/${membershipID}`);
+//   }
+
+//   // Payment History
+//   async getPaymentHistory(membershipID: string): Promise<{ payments: PaymentHistory[] }> {
+//     return this.request<{ payments: PaymentHistory[] }>(`/api/payment/history/${membershipID}`);
+//   }
+
+//   // Trainer Information
+//   async getAssignedTrainer(membershipID: string): Promise<{ trainer: TrainerResponse | null }> {
+//     return this.request<{ trainer: TrainerResponse | null }>(`/api/member/trainer/${membershipID}`);
+//   }
+
+//   // Get Trainer Passport Photo
+//   async getTrainerPassportPhoto(trainerID: string): Promise<{ photo: string }> {
+//     return this.request<{ photo: string }>(`/api/trainer/passport-photo/${trainerID}`);
+//   }
+
+//   // Get Assigned Members for Trainer
+//   async getTrainerAssignedMembers(trainerID: string): Promise<{ assigned_members: any[] }> {
+//     return this.request<{ assigned_members: any[] }>(`/api/trainer/assigned-members/${trainerID}`);
+//   }
+
+//   // Membership Plans
+//   async getMembershipPlans(): Promise<{ plans: MembershipPlan[] }> {
+//     return this.request<{ plans: MembershipPlan[] }>('/api/membership/plans');
+//   }
+
+//   // Identity Document
+//   async getIdentityDocument(membershipID: string): Promise<IdentityDocumentResponse> {
+//     return this.request<IdentityDocumentResponse>(`/api/member/identity-document/${membershipID}`);
+//   }
+
+//   // OTP-less Login
+//   async handleOTPlessLogin(data: { email?: string; phone_number?: string }): Promise<LoginResponse> {
+//     return this.request<LoginResponse>('/api/auth/handlelogin', {
+//       method: 'POST',
+//       body: JSON.stringify(data),
+//     });
+//   }
+
+//   // Passport Photo
+//   async getPassportPhoto(membershipID: string): Promise<{ photo: string }> {
+//     return this.request<{ photo: string }>(`/api/member/passport-photo/${membershipID}`);
+//   }
+
+//   // Get All Trainers
+//   async getAllTrainers(): Promise<{ trainers: TrainerResponse[] }> {
+//     return this.request<{ trainers: TrainerResponse[] }>('/api/trainers');
+//   }
+
+//   // Get Trainer by ID
+//   async getTrainerById(trainerID: string): Promise<{ trainer: TrainerResponse }> {
+//     return this.request<{ trainer: TrainerResponse }>(`/api/trainers/${trainerID}`);
+//   }
+// }
+
+// export const apiService = new ApiService();
