@@ -23,7 +23,7 @@ const API_BASE_URL = 'https://api.apithlete.webgeon.com';
 
 export default function ProfileSettingsScreen() {
   const { theme } = useTheme();
-  const { user, token } = useAuth(); // Removed updateUser since it's not working
+  const { user, token } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
@@ -165,7 +165,10 @@ export default function ProfileSettingsScreen() {
         
         base64Image = await new Promise((resolve) => {
           const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.split(',')[1]); // Remove data URL prefix
+          };
           reader.readAsDataURL(file);
         });
         mimeType = file.type || 'image/jpeg';
@@ -177,14 +180,13 @@ export default function ProfileSettingsScreen() {
           throw new Error('Image size should be less than 500KB');
         }
         
-        const fileContent = await FileSystem.readAsStringAsync(fileUri, {
+        base64Image = await FileSystem.readAsStringAsync(fileUri, {
           encoding: FileSystem.EncodingType.Base64,
         });
-        base64Image = `data:${imageAsset.type || 'image/jpeg'};base64,${fileContent}`;
         mimeType = imageAsset.type || 'image/jpeg';
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/auth/edit/${user._id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/edit/${user.membershipID}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -196,12 +198,13 @@ export default function ProfileSettingsScreen() {
         }),
       });
 
+      const responseData = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to upload profile picture');
+        throw new Error(responseData.message || 'Failed to upload profile picture');
       }
 
-      setProfileImage(base64Image);
+      setProfileImage(`data:${mimeType};base64,${base64Image}`);
       Alert.alert('Success', 'Profile picture updated successfully');
     } catch (error) {
       console.error('Error uploading photo:', error);
@@ -237,7 +240,7 @@ export default function ProfileSettingsScreen() {
       };
 
       if (profileImage && profileImage.startsWith('data:')) {
-        payload.passport_photo = profileImage;
+        payload.passport_photo = profileImage.split(',')[1];
         payload.photo_mime_type = profileImage.split(';')[0].split(':')[1];
       }
 
