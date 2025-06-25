@@ -17,6 +17,7 @@ import { apiService } from '@/services/api';
 import { User, Mail, Phone, MapPin, Calendar, Heart, Users, Clock, ArrowLeft, CircleCheck as CheckCircle, Upload, FileText } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '@/components/AuthProvider';
 
 const { width } = Dimensions.get('window');
 
@@ -63,6 +64,7 @@ export default function RegisterScreen() {
   const [passportPhoto, setPassportPhoto] = useState<any>(null);
   const router = useRouter();
   const { theme } = useTheme();
+  const {login}= useAuth();
 
   const updateField = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -186,7 +188,10 @@ export default function RegisterScreen() {
 
       const response = await apiService.registerUser(formDataToSend);
       
-      if (response.token) {
+      if (response.token && response.user) {
+
+        await login(response.token, response.user);
+
         Alert.alert(
           'Registration Successful!',
           `Welcome ${formData.full_name}! Your membership ID is ${response.user?.membershipID}.`,
@@ -197,6 +202,8 @@ export default function RegisterScreen() {
             }
           ]
         );
+      }else{
+        throw new Error('Registration Failed-no token received');
       }
     } catch (error: any) {
       setError(error.message || 'Registration failed. Please try again.');
