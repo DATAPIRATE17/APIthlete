@@ -125,13 +125,14 @@ export default function PaymentHistoryScreen({ navigation }: { navigation: any }
       const data = await response.json();
       const paymentsArray = Array.isArray(data) ? data : [data];
       
-      // Validate and normalize payment data
+      // Normalize payment status to handle both 'status' and 'payment_status'
       const validatedPayments = paymentsArray.map(payment => ({
         ...payment,
-        status: payment.status?.toLowerCase() || 'pending',
+        status: (payment.status || payment.payment_status || 'pending').toLowerCase(),
         amount_paid: payment.amount_paid || '₹0',
-        invoice_number: payment.invoice_number || 'N/A',
-        transactionID: payment.transactionID || 'N/A'
+        invoice_number: payment.invoice_number || `INV-${payment.transactionID?.slice(-6).toUpperCase() || '000000'}`,
+        transactionID: payment.transactionID || 'N/A',
+        id: payment.id || payment.transactionID || Math.random().toString(36).substring(7) // Ensure unique ID
       }));
 
       setPayments(validatedPayments);
@@ -160,25 +161,40 @@ export default function PaymentHistoryScreen({ navigation }: { navigation: any }
   };
 
   const getStatusIcon = (status = 'pending') => {
-    switch (status.toLowerCase()) {
-      case 'completed': return <CheckCircle size={20} color="#22C55E" />;
-      case 'pending': return <Clock size={20} color="#F59E0B" />;
-      case 'failed': return <XCircle size={20} color="#EF4444" />;
-      default: return <Clock size={20} color="#6B7280" />;
+    const normalizedStatus = status.toLowerCase();
+    switch (normalizedStatus) {
+      case 'completed': 
+      case 'paid': 
+        return <CheckCircle size={20} color="#22C55E" />;
+      case 'pending': 
+        return <Clock size={20} color="#F59E0B" />;
+      case 'failed': 
+      case 'rejected':
+        return <XCircle size={20} color="#EF4444" />;
+      default: 
+        return <Clock size={20} color="#6B7280" />;
     }
   };
 
   const getStatusColor = (status = 'pending') => {
-    switch (status.toLowerCase()) {
-      case 'completed': return '#22C55E';
-      case 'pending': return '#F59E0B';
-      case 'failed': return '#EF4444';
-      default: return '#6B7280';
+    const normalizedStatus = status.toLowerCase();
+    switch (normalizedStatus) {
+      case 'completed': 
+      case 'paid': 
+        return '#22C55E';
+      case 'pending': 
+        return '#F59E0B';
+      case 'failed': 
+      case 'rejected':
+        return '#EF4444';
+      default: 
+        return '#6B7280';
     }
   };
 
   const handleDownloadInvoice = async (payment: Payment) => {
-    if (payment.status.toLowerCase() !== 'completed') {
+    const normalizedStatus = payment.status.toLowerCase();
+    if (normalizedStatus !== 'completed' && normalizedStatus !== 'paid') {
       Alert.alert('Error', 'Invoice is only available for completed payments');
       return;
     }
@@ -186,10 +202,18 @@ export default function PaymentHistoryScreen({ navigation }: { navigation: any }
     setDownloadingInvoice(payment.id);
     try {
       const htmlContent = generateInvoiceHTML(payment);
-      const { uri } = await Print.printToFileAsync({ html: htmlContent });
-      const newUri = `${FileSystem.documentDirectory}invoice_${payment.invoice_number}.pdf`;
-      await FileSystem.moveAsync({ from: uri, to: newUri });
+      const { uri } = await Print.printToFileAsync({ html: htmlContent ,width:612, height:792});
 
+      const fileName =`Invoice_${payment.invoice_number}_${Date.now()}.pdf`;
+      const newUri = `${FileSystem.documentDirectory}${fileName}`;
+      await FileSystem.moveAsync({ from: uri, to: newUri });
+      
+      const fileInfo = await FileSystem.getInfoAsync(newUri);
+
+      if (!fileInfo.exists) {
+        throw new Error('Failed to save invoice file');
+      }  
+      
       Alert.alert(
         'Invoice Downloaded',
         'What would you like to do with the invoice?',
@@ -216,38 +240,62 @@ export default function PaymentHistoryScreen({ navigation }: { navigation: any }
     }
   };
 
-  const shareInvoice = async (fileUri: string) => {
-    try {
+  const shareInvoice = async (fileUri: string, fileName: string) => {
+
+     try {
+    // Ensure the file exists
+      const fileInfo = await FileSystem.getInfoAsync(fileUri);
+      if (!fileInfo.exists) {
+        throw new Error('Invoice file not found');
+      }
+
+    // Create a temporary copy that can be shared
+      const shareableUri = `${FileSystem.cacheDirectory}${fileName}`;
+      await FileSystem.copyAsync({ from: fileUri, to: shareableUri });
+
+    // Share the file
       await Share.share({
-        url: fileUri,
-        title: 'Invoice',
+        url: shareableUri,
+        title: `Invoice ${fileName}`,
         message: 'Here is your invoice PDF',
+      }, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Share Invoice',
       });
     } catch (error) {
       console.error('Error sharing invoice:', error);
-      Alert.alert('Error', 'Failed to share invoice');
+      Alert.alert('Error', 'Failed to share invoice. Please try again.');
     }
   };
 
   const handleShareInvoice = async (payment: Payment) => {
+    const normalizedStatus = payment.status.toLowerCase();
     try {
-      if (payment.status.toLowerCase() !== 'completed') {
+      if (normalizedStatus !== 'completed' && normalizedStatus !== 'paid') {
         Alert.alert('Error', 'Only completed payments can be shared');
         return;
       }
-
+       
       const htmlContent = generateInvoiceHTML(payment);
-      const { uri } = await Print.printToFileAsync({ html: htmlContent });
-      await shareInvoice(uri);
+      const { uri } = await Print.printToFileAsync({ 
+        html: htmlContent,
+        width: 612,
+        height: 792,
+      });
+    
+      const fileName = `Invoice_${payment.invoice_number}_${Date.now()}.pdf`;
+      await shareInvoice(uri, fileName);
     } catch (error) {
       console.error('Error sharing invoice:', error);
-      Alert.alert('Error', 'Failed to share invoice');
+      Alert.alert('Error', 'Failed to generate invoice for sharing');
     }
   };
+      
 
   const generateInvoiceHTML = (payment: Payment) => {
     const logoData = gymInfo?.logo ? `data:${gymInfo.logo.contentType};base64,${gymInfo.logo.base64}` : '';
     const safeStatus = payment.status?.toLowerCase() || 'pending';
+    const isCompleted = safeStatus === 'completed' || safeStatus === 'paid';
     
     return `
       <html>
@@ -280,6 +328,7 @@ export default function PaymentHistoryScreen({ navigation }: { navigation: any }
             }
             .completed { background-color: #E6F7E6; color: #2E7D32; }
             .pending { background-color: #FFF8E1; color: #F57F17; }
+            .failed { background-color: #FFEBEE; color: #C62828; }
             .footer { text-align: center; font-size: 10px; color: #999; margin-top: 30px; }
           </style>
         </head>
@@ -313,7 +362,9 @@ export default function PaymentHistoryScreen({ navigation }: { navigation: any }
               <div class="info-title">PAYMENT DETAILS:</div>
               <div class="info-text">Transaction ID: ${payment.transactionID}</div>
               <div class="info-text">Status: ${payment.status}</div>
-              <div class="status ${safeStatus}">${payment.status.toUpperCase()}</div>
+              <div class="status ${isCompleted ? 'completed' : safeStatus}">
+                ${isCompleted ? 'PAID' : payment.status.toUpperCase()}
+              </div>
             </div>
           </div>
 
@@ -353,11 +404,20 @@ export default function PaymentHistoryScreen({ navigation }: { navigation: any }
 
   const filteredPayments = payments.filter(payment => {
     if (selectedFilter === 'all') return true;
-    return payment.status.toLowerCase() === selectedFilter.toLowerCase();
+    const normalizedStatus = payment.status.toLowerCase();
+    const normalizedFilter = selectedFilter.toLowerCase();
+    
+    if (normalizedFilter === 'completed') {
+      return normalizedStatus === 'completed' || normalizedStatus === 'paid';
+    }
+    return normalizedStatus === normalizedFilter;
   });
 
   const totalAmount = payments
-    .filter(p => p.status.toLowerCase() === 'completed')
+    .filter(p => {
+      const status = p.status.toLowerCase();
+      return status === 'completed' || status === 'paid';
+    })
     .reduce((sum, p) => sum + parseFloat(p.amount_paid.replace(/[^0-9.]/g, '')), 0);
 
   const styles = StyleSheet.create({
@@ -666,11 +726,16 @@ export default function PaymentHistoryScreen({ navigation }: { navigation: any }
             <Text style={styles.statLabel}>Total Paid</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{payments.filter(p => p.status === 'completed').length}</Text>
+            <Text style={styles.statValue}>
+              {payments.filter(p => {
+                const status = p.status.toLowerCase();
+                return status === 'completed' || status === 'paid';
+              }).length}
+            </Text>
             <Text style={styles.statLabel}>Completed</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{payments.filter(p => p.status === 'pending').length}</Text>
+            <Text style={styles.statValue}>{payments.filter(p => p.status.toLowerCase() === 'pending').length}</Text>
             <Text style={styles.statLabel}>Pending</Text>
           </View>
         </View>
@@ -742,19 +807,23 @@ export default function PaymentHistoryScreen({ navigation }: { navigation: any }
                 <TouchableOpacity
                   style={[
                     styles.actionButton,
-                    payment.status !== 'completed' && styles.actionButtonDisabled
+                    (payment.status.toLowerCase() !== 'completed' && payment.status.toLowerCase() !== 'paid') && styles.actionButtonDisabled
                   ]}
                   onPress={() => handleDownloadInvoice(payment)}
-                  disabled={payment.status !== 'completed' || downloadingInvoice === payment.id}
+                  disabled={(payment.status.toLowerCase() !== 'completed' && payment.status.toLowerCase() !== 'paid') || downloadingInvoice === payment.id}
                 >
                   {downloadingInvoice === payment.id ? (
                     <ActivityIndicator size="small" color={theme.primary} />
                   ) : (
-                    <Download size={12} color={payment.status === 'completed' ? theme.primary : theme.textSecondary} />
+                    <Download size={12} color={
+                      (payment.status.toLowerCase() === 'completed' || payment.status.toLowerCase() === 'paid') 
+                        ? theme.primary 
+                        : theme.textSecondary
+                    } />
                   )}
                   <Text style={[
                     styles.actionButtonText,
-                    payment.status !== 'completed' && styles.actionButtonTextDisabled
+                    (payment.status.toLowerCase() !== 'completed' && payment.status.toLowerCase() !== 'paid') && styles.actionButtonTextDisabled
                   ]}>
                     PDF
                   </Text>
@@ -763,15 +832,19 @@ export default function PaymentHistoryScreen({ navigation }: { navigation: any }
                 <TouchableOpacity
                   style={[
                     styles.actionButton,
-                    payment.status !== 'completed' && styles.actionButtonDisabled
+                    (payment.status.toLowerCase() !== 'completed' && payment.status.toLowerCase() !== 'paid') && styles.actionButtonDisabled
                   ]}
                   onPress={() => handleShareInvoice(payment)}
-                  disabled={payment.status !== 'completed'}
+                  disabled={payment.status.toLowerCase() !== 'completed' && payment.status.toLowerCase() !== 'paid'}
                 >
-                  <ShareIcon size={12} color={payment.status === 'completed' ? theme.primary : theme.textSecondary} />
+                  <ShareIcon size={12} color={
+                    (payment.status.toLowerCase() === 'completed' || payment.status.toLowerCase() === 'paid') 
+                      ? theme.primary 
+                      : theme.textSecondary
+                  } />
                   <Text style={[
                     styles.actionButtonText,
-                    payment.status !== 'completed' && styles.actionButtonTextDisabled
+                    (payment.status.toLowerCase() !== 'completed' && payment.status.toLowerCase() !== 'paid') && styles.actionButtonTextDisabled
                   ]}>
                     Share
                   </Text>
