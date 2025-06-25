@@ -31,7 +31,7 @@ interface MembershipPlan {
 
 export default function MembershipPlansScreen() {
   const { theme } = useTheme();
-  const { user, updateUser } = useAuth();
+  const { user, updateUser,token } = useAuth();
   const [membershipPlans, setMembershipPlans] = useState<MembershipPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
@@ -49,23 +49,32 @@ export default function MembershipPlansScreen() {
       setLoading(true);
       setError(null);
       
+      if (!token) {
+        throw new Error('Authentication required. Please login again.');
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/membership/all`, {
         headers: {
-          'Authorization': `Bearer ${user?.token}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-      
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to load plans');
+      }
+
       const data = await response.json();
       
       if (data.success) {
         setMembershipPlans(data.plans);
       } else {
-        setError(data.message || 'Failed to load membership plans');
+        throw new Error(data.message || 'Failed to load membership plans');
       }
     } catch (error) {
       console.error('Error loading membership plans:', error);
-      setError('Failed to load membership plans. Please try again later.');
+      setError(error.message || 'Failed to load membership plans. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -73,22 +82,30 @@ export default function MembershipPlansScreen() {
 
   const loadCurrentPlan = async () => {
     try {
-      if (user?.membershipID) {
-        const response = await fetch(`${API_BASE_URL}/api/payment/payment-details/${user.membershipID}`, {
-          headers: {
-            'Authorization': `Bearer ${user?.token}`,
-            'Content-Type': 'application/json',
-          },
+      if (!user?.membershipID || !token) {
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/payment/payment-details/${user.membershipID}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.warn('Error loading current plan:', errorData.message);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data.membership_plan) {
+        setCurrentPlan({
+          name: data.membership_plan,
+          expiry: data.renewal_date ? new Date(data.renewal_date).toLocaleDateString() : 'Not available'
         });
-        
-        const data = await response.json();
-        
-        if (data.membership_plan) {
-          setCurrentPlan({
-            name: data.membership_plan,
-            expiry: data.renewal_date ? new Date(data.renewal_date).toLocaleDateString() : 'Not available'
-          });
-        }
       }
     } catch (error) {
       console.error('Error loading current plan:', error);
@@ -122,37 +139,43 @@ export default function MembershipPlansScreen() {
       setProcessingPayment(true);
       setError(null);
       
+      if (!token || !user?.membershipID) {
+        throw new Error('Authentication required. Please login again.');
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/payment/initiate`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${user?.token}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          membershipID: user?.membershipID,
+          membershipID: user.membershipID,
           membership_plan: planData.name
         }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Payment initiation failed');
+      }
       
       const data = await response.json();
 
       if (data.success && data.checkoutUrl) {
-        // Open the payment URL in browser
         const canOpen = await Linking.canOpenURL(data.checkoutUrl);
         if (canOpen) {
           await Linking.openURL(data.checkoutUrl);
-          // Start polling for payment status
           pollPaymentStatus(data.orderId);
         } else {
-          setError('Cannot open payment link');
+          throw new Error('Cannot open payment link');
         }
       } else {
-        setError(data.error || 'Failed to initiate payment');
-        setSelectedPlan(null);
+        throw new Error(data.error || 'Failed to initiate payment');
       }
     } catch (error) {
       console.error('Payment error:', error);
-      setError('Failed to process payment. Please try again.');
+      setError(error.message || 'Failed to process payment. Please try again.');
       setSelectedPlan(null);
     } finally {
       setProcessingPayment(false);
@@ -168,10 +191,15 @@ export default function MembershipPlansScreen() {
         
         const response = await fetch(`${API_BASE_URL}/api/payment/status/${orderId}`, {
           headers: {
-            'Authorization': `Bearer ${user?.token}`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         });
+
+        if (!response.ok) {
+          clearInterval(interval);
+          throw new Error('Failed to check payment status');
+        }
         
         const data = await response.json();
         
@@ -179,11 +207,10 @@ export default function MembershipPlansScreen() {
           clearInterval(interval);
           Alert.alert('Payment Successful', 'Your membership has been upgraded successfully!');
           loadCurrentPlan();
-          // Refresh user data
           if (user) {
             const userResponse = await fetch(`${API_BASE_URL}/api/user/${user.membershipID}`, {
               headers: {
-                'Authorization': `Bearer ${user?.token}`,
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
               },
             });
@@ -439,6 +466,18 @@ export default function MembershipPlansScreen() {
       justifyContent: 'center',
       alignItems: 'center',
     },
+    errorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    errorText: {
+      color: theme.error,
+      fontSize: 16,
+      textAlign: 'center',
+      marginBottom: 20,
+    },
   });
 
   if (error) {
@@ -449,8 +488,8 @@ export default function MembershipPlansScreen() {
           <Text style={styles.headerSubtitle}>Choose the perfect plan for your fitness journey</Text>
         </View>
         
-        <View style={[styles.content, { justifyContent: 'center', alignItems: 'center' }]}>
-          <Text style={{ color: theme.error, marginBottom: 20 }}>{error}</Text>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity
             style={styles.selectButton}
             onPress={() => {
@@ -481,8 +520,14 @@ export default function MembershipPlansScreen() {
           <Text style={styles.headerSubtitle}>Choose the perfect plan for your fitness journey</Text>
         </View>
         
-        <View style={[styles.content, { justifyContent: 'center', alignItems: 'center' }]}>
-          <Text style={{ color: theme.textSecondary }}>No membership plans available.</Text>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>No membership plans available.</Text>
+          <TouchableOpacity
+            style={styles.selectButton}
+            onPress={loadMembershipPlans}
+          >
+            <Text style={styles.selectButtonText}>Refresh</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -490,7 +535,6 @@ export default function MembershipPlansScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Image
           source={{ uri: 'https://images.pexels.com/photos/1552242/pexels-photo-1552242.jpeg' }}
@@ -501,9 +545,7 @@ export default function MembershipPlansScreen() {
         <Text style={styles.headerSubtitle}>Choose the perfect plan for your fitness journey</Text>
       </View>
 
-      {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Current Plan */}
         {currentPlan && (
           <View style={styles.currentPlanCard}>
             <Text style={styles.currentPlanTitle}>Your Current Plan</Text>
@@ -512,7 +554,6 @@ export default function MembershipPlansScreen() {
           </View>
         )}
 
-        {/* Recommended Section */}
         <View style={styles.recommendedSection}>
           <Text style={styles.recommendedTitle}>💪 Upgrade Your Experience</Text>
           <Text style={styles.recommendedText}>
