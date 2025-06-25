@@ -520,11 +520,11 @@ export default function ProfileSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#0F172A',
     paddingBottom: 100,
   },
   header: {
-    backgroundColor: '#4a90e2',
+    backgroundColor: '#22C55E',
     paddingTop: 50,
     paddingBottom: 30,
     paddingHorizontal: 20,
@@ -554,7 +554,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   profileSection: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#1E293B',
     borderRadius: 20,
     padding: 24,
     marginBottom: 24,
@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#4a90e2',
+    backgroundColor: '#22C55E',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -588,16 +588,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#4a90e2',
+    backgroundColor: '#22C55E',
     borderRadius: 20,
     padding: 8,
     borderWidth: 3,
-    borderColor: '#f8f9fa',
+    borderColor: '#1E293B',
   },
   profileName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#212529',
+    color: '#fff',
     marginBottom: 4,
   },
   profileId: {
@@ -614,13 +614,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   changePhotoText: {
-    color: '#4a90e2',
+    color: '#22C55E',
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 8,
   },
   formSection: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#1E293B',
     borderRadius: 20,
     padding: 24,
     marginBottom: 24,
@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#212529',
+    color: '#fff',
     marginBottom: 20,
   },
   formGroup: {
@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#212529',
+    color: '#fff',
     marginBottom: 8,
   },
   requiredLabel: {
@@ -661,7 +661,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#212529',
+    color: '#94A3B8',
     fontWeight: '500',
   },
   genderContainer: {
@@ -671,7 +671,7 @@ const styles = StyleSheet.create({
   genderButton: {
     flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 1,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e9ecef',
@@ -680,26 +680,26 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   genderButtonActive: {
-    backgroundColor: '#4a90e2',
-    borderColor: '#4a90e2',
+    backgroundColor: '#22C55E',
+    borderColor: '#22C55E',
   },
   genderButtonText: {
     fontSize: 16,
-    color: '#212529',
+    color: '#94A3B8',
     fontWeight: '500',
   },
   genderButtonTextActive: {
     color: 'white',
   },
   saveButton: {
-    backgroundColor: '#4a90e2',
+    backgroundColor: '#22C55E',
     paddingVertical: 18,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 20,
     flexDirection: 'row',
     justifyContent: 'center',
-    shadowColor: '#4a90e2',
+    shadowColor: '#22C55E',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
