@@ -17,7 +17,7 @@ export default function TabLayout() {
           paddingTop: 15,
           height: 90, // Increased height to accommodate more padding
           position: 'absolute',
-          bottom: 0,
+          // bottom: 30,
         },
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: theme.textSecondary,
@@ -27,7 +27,7 @@ export default function TabLayout() {
           marginBottom: 12, // Increased margin to move labels up more
         },
         tabBarIconStyle: {
-          marginTop: 8, // Increased margin to move icons up more
+          marginTop: -10, // Increased margin to move icons up more
         },
       }}
     >

@@ -107,15 +107,15 @@ export default function MyTrainerScreen() {
         rating: data.rating || '4.8',
         bio: data.bio || 'Certified trainer with expertise in various fitness disciplines.',
         availability: data.availability,
-        weeklySchedule: {
-          Monday: '6:00 AM - 12:00 PM',
-          Tuesday: '6:00 AM - 12:00 PM',
-          Wednesday: '6:00 AM - 12:00 PM',
-          Thursday: '6:00 AM - 12:00 PM',
-          Friday: '6:00 AM - 12:00 PM',
-          Saturday: 'Rest Day',
-          Sunday: 'Rest Day'
-        },
+        // weeklySchedule: {
+        //   Monday: '6:00 AM - 12:00 PM',
+        //   Tuesday: '6:00 AM - 12:00 PM',
+        //   Wednesday: '6:00 AM - 12:00 PM',
+        //   Thursday: '6:00 AM - 12:00 PM',
+        //   Friday: '6:00 AM - 12:00 PM',
+        //   Saturday: 'Rest Day',
+        //   Sunday: 'Rest Day'
+        // },
         assigned_Members: data.assigned_Members
       };
 

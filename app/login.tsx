@@ -460,13 +460,13 @@ export default function LoginScreen() {
                 <ArrowRight size={20} color="white" />
               </TouchableOpacity>
 
-              <TouchableOpacity
+              {/* <TouchableOpacity
                 style={styles.registerButton}
                 onPress={handleRegister}
               >
                 <UserPlus size={20} color={theme.primary} />
                 <Text style={styles.registerButtonText}>New User? Register Here</Text>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </>
           ) : (
             <>
