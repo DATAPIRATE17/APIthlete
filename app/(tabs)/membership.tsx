@@ -15,7 +15,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/components/AuthProvider';
 import { Check, Crown, Star, Zap, Shield, Sparkles, Dumbbell, Users, Calendar, Target } from 'lucide-react-native';
 
-const API_BASE_URL = 'https://api.apithlete.webgeon.com';
+const API_BASE_URL = 'https://portal.flexzonegym.com';
 const { width } = Dimensions.get('window');
 
 interface MembershipPlan {
