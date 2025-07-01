@@ -53,7 +53,7 @@ export default function PaymentHistoryScreen({ navigation }: { navigation: any }
   const [error, setError] = useState<string | null>(null);
   const [gymInfo, setGymInfo] = useState<GymInfo | null>(null);
 
-  const API_BASE_URL = 'https://api.apithlete.webgeon.com/api';
+  const API_BASE_URL = 'https://portal.flexzonegym.com/api';
 
   useEffect(() => {
     const fetchData = async () => {
