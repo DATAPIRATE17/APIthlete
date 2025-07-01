@@ -61,7 +61,7 @@ export default function DashboardScreen() {
   const [remainingTime, setRemainingTime] = useState<string>('2:00');
   const router = useRouter();
 
-  const API_BASE_URL = 'https://api.apithlete.webgeon.com/api';
+  const API_BASE_URL = 'https://portal.flexzonegym.com/api';
 
   useEffect(() => {
     if (token) {
