@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://api.apithlete.webgeon.com';
+const API_BASE_URL = 'https://portal.flexzonegym.com';
 
 export interface SendOTPRequest {
   phone: string;
