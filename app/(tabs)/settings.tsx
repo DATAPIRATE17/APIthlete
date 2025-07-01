@@ -19,7 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 
 const { width } = Dimensions.get('window');
-const API_BASE_URL = 'https://portal.flexzonegym.com/api';
+const API_BASE_URL = 'https://portal.flexzonegym.com';
 
 export default function ProfileSettingsScreen() {
   const { theme } = useTheme();
