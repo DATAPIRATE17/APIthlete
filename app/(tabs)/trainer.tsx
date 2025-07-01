@@ -16,7 +16,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/components/AuthProvider';
 import { Users, Star, Calendar, Phone, MapPin, Clock, CircleCheck as CheckCircle, User, Mail, Target, Award } from 'lucide-react-native';
 
-const API_BASE_URL = 'https://api.apithlete.webgeon.com';
+const API_BASE_URL = 'https://portal.flexzonegym.com';
 const { width } = Dimensions.get('window');
 
 interface Trainer {
