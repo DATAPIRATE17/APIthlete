@@ -12,10 +12,10 @@ import {
   Dimensions,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { Phone, ArrowRight, Dumbbell, Shield, UserPlus } from 'lucide-react-native';
+import { Phone, ArrowRight, Dumbbell, Shield, UserPlus, ArrowLeft } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -30,12 +30,17 @@ export default function LoginScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const { sendOTP, verifyOTP, user } = useAuth();
+  const { gymId, gymName } = useLocalSearchParams<{ gymId?: string; gymName?: string }>();
 
   useEffect(() => {
     if (user) {
       router.replace('/(tabs)');
     }
   }, [user]);
+
+  const handleBackToWelcome = () => {
+    router.back(); // This will go back to the welcome screen
+  };
 
   const handleSendOTP = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
@@ -160,6 +165,15 @@ export default function LoginScreen() {
       justifyContent: 'center',
       padding: 24,
     },
+    backButton: {
+      position: 'absolute',
+      top: 50,
+      left: 20,
+      zIndex: 10,
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      borderRadius: 20,
+      padding: 8,
+    },
     logoContainer: {
       alignItems: 'center',
       marginBottom: 48,
@@ -191,6 +205,19 @@ export default function LoginScreen() {
       textAlign: 'center',
       marginTop: 8,
       fontWeight: '500',
+    },
+    gymInfo: {
+      backgroundColor: theme.primary + '20',
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 24,
+      alignItems: 'center',
+    },
+    gymInfoText: {
+      fontSize: 14,
+      color: theme.primary,
+      fontWeight: '600',
+      textAlign: 'center',
     },
     formContainer: {
       backgroundColor: theme.surface,
@@ -397,6 +424,16 @@ export default function LoginScreen() {
         style={styles.backgroundImage}
         resizeMode="cover"
       />
+  
+      {/* Back Button - Only show when OTP input is visible */}
+    
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={handleBackToWelcome}
+        >
+          <ArrowLeft size={24} color={theme.text} />
+        </TouchableOpacity>
+     
       
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.logoContainer}>
@@ -406,6 +443,15 @@ export default function LoginScreen() {
           <Text style={styles.logoText}>Apiathelete</Text>
           <Text style={styles.subtitle}>Fitness Management System</Text>
         </View>
+
+        {/* Show gym info if coming from gym access */}
+        {gymName && (
+          <View style={styles.gymInfo}>
+            <Text style={styles.gymInfoText}>
+              Logging into {gymName}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.formContainer}>
           {/* Step Indicator */}
@@ -459,14 +505,6 @@ export default function LoginScreen() {
                 </Text>
                 <ArrowRight size={20} color="white" />
               </TouchableOpacity>
-
-              {/* <TouchableOpacity
-                style={styles.registerButton}
-                onPress={handleRegister}
-              >
-                <UserPlus size={20} color={theme.primary} />
-                <Text style={styles.registerButtonText}>New User? Register Here</Text>
-              </TouchableOpacity> */}
             </>
           ) : (
             <>
