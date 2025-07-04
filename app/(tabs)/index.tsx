@@ -38,10 +38,7 @@ interface PersonalInfo {
 
 interface GymInfo {
   name: string;
-  logo?: {
-    contentType: string;
-    base64: string;
-  };
+  logoUrl?: string;
 }
 
 export default function DashboardScreen() {
@@ -101,23 +98,23 @@ export default function DashboardScreen() {
         fetch(`${API_BASE_URL}/gym/logo`)
       ]);
 
-      if (!infoResponse.ok || !logoResponse.ok) {
+      if (!infoResponse.ok) {
         throw new Error('Failed to fetch gym information');
       }
 
       const infoData = await infoResponse.json();
-      const logoData = await logoResponse.json();
+      const logoData = logoResponse.ok ? await logoResponse.json() : null;
 
       setGymInfo({
         name: infoData.name,
-        logo: logoData.base64 ? logoData : null
+        logoUrl: logoData?.logoUrl || null
       });
     } catch (error) {
       console.error('Error fetching gym info:', error);
       // Fallback to default gym info if API fails
       setGymInfo({
         name: 'APIthlete',
-        logo: null
+        logoUrl: null
       });
     }
   };
@@ -138,7 +135,7 @@ export default function DashboardScreen() {
         throw new Error(`Profile error: ${profileResponse.status}`);
       }
 
-      const responseData= await profileResponse.json();
+      const responseData = await profileResponse.json();
       const profileData = responseData.user;
       
       // Set personal info from profile data
@@ -153,7 +150,7 @@ export default function DashboardScreen() {
 
       // Set membership details from profile data
       setMembershipDetails({
-        status: profileData.membership_status ||user?.membership_status || 'Inactive',
+        status: profileData.membership_status || user?.membership_status || 'Inactive',
         membershipID: profileData.membershipID || user?.membershipID || 'N/A',
         plan: profileData.membership_plan || 'N/A',
         paymentStatus: profileData.payment_status || 'Pending',
@@ -665,9 +662,9 @@ export default function DashboardScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.logoContainer}>
-            {gymInfo?.logo?.base64 ? (
+            {gymInfo?.logoUrl ? (
               <Image 
-                source={{ uri: `data:${gymInfo.logo.contentType};base64,${gymInfo.logo.base64}` }}
+                source={{ uri: gymInfo.logoUrl }}
                 style={styles.logoImage}
               />
             ) : (
@@ -935,7 +932,15 @@ export default function DashboardScreen() {
 
 
 
-//qr without countdown timer
+
+
+
+
+
+
+
+
+
 
 // import React, { useState, useEffect } from 'react';
 // import {
@@ -996,9 +1001,11 @@ export default function DashboardScreen() {
 //   const [qrCode, setQrCode] = useState<string | null>(null);
 //   const [qrCodeLoading, setQrCodeLoading] = useState(false);
 //   const [gymInfo, setGymInfo] = useState<GymInfo | null>(null);
+//   const [qrExpiryTime, setQrExpiryTime] = useState<number | null>(null);
+//   const [remainingTime, setRemainingTime] = useState<string>('2:00');
 //   const router = useRouter();
 
-//   const API_BASE_URL = 'https://api.apithlete.webgeon.com/api';
+//   const API_BASE_URL = 'https://portal.flexzonegym.com/api';
 
 //   useEffect(() => {
 //     if (token) {
@@ -1006,6 +1013,30 @@ export default function DashboardScreen() {
 //       fetchGymInfo();
 //     }
 //   }, [token]);
+
+//   // Countdown timer effect
+//   useEffect(() => {
+//     if (!qrExpiryTime) return;
+
+//     const interval = setInterval(() => {
+//       const now = Date.now();
+//       const diff = qrExpiryTime - now;
+      
+//       if (diff <= 0) {
+//         clearInterval(interval);
+//         setQrCode(null);
+//         setQrExpiryTime(null);
+//         setRemainingTime('0:00');
+//         return;
+//       }
+
+//       const minutes = Math.floor(diff / 60000);
+//       const seconds = Math.floor((diff % 60000) / 1000);
+//       setRemainingTime(`${minutes}:${seconds < 10 ? '0' : ''}${seconds}`);
+//     }, 1000);
+
+//     return () => clearInterval(interval);
+//   }, [qrExpiryTime]);
 
 //   const fetchGymInfo = async () => {
 //     try {
@@ -1175,6 +1206,9 @@ export default function DashboardScreen() {
       
 //       const responseData = await response.json();
 //       setQrCode(responseData.qrCode);
+//       // Set expiry time to current time + 2 minutes (120000 ms)
+//       setQrExpiryTime(Date.now() + 120000);
+//       setRemainingTime('2:00');
 //     } catch (error: any) {
 //       console.error('QR code generation error:', error);
 //       Alert.alert('Error', error.message || 'Failed to generate QR code');
@@ -1643,8 +1677,22 @@ export default function DashboardScreen() {
 //                   resizeMode="contain"
 //                 />
 //                 <Text style={[styles.checkInTime, { textAlign: 'center' }]}>
-//                   Expires in 2 minutes
+//                   Expires in {remainingTime}
 //                 </Text>
+//                 <TouchableOpacity
+//                   style={[styles.checkInButton, { marginTop: 12 }]}
+//                   onPress={generateQRCode}
+//                   disabled={qrCodeLoading}
+//                 >
+//                   {qrCodeLoading ? (
+//                     <ActivityIndicator color="white" size="small" />
+//                   ) : (
+//                     <>
+//                       <Shield size={20} color="white" />
+//                       <Text style={styles.checkInButtonText}>Refresh QR Code</Text>
+//                     </>
+//                   )}
+//                 </TouchableOpacity>
 //               </View>
 //             ) : (
 //               <TouchableOpacity
@@ -1828,6 +1876,10 @@ export default function DashboardScreen() {
 //     </View>
 //   );
 // }
+
+
+
+
 
 
 
