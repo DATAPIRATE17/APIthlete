@@ -16,8 +16,9 @@ interface AuthContextType {
   token: string | null;
   sendOTP: (phoneNumber: string) => Promise<{ success: boolean; sessionId?: string }>;
   verifyOTP: (sessionId: string, otp: string) => Promise<{ success: boolean; isNewUser?: boolean }>;
-  login:(token: string, user: User) => Promise<void>;
+  login: (token: string, user: User) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (userData: User) => void;
   isLoading: boolean;
 }
 
@@ -95,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
    
-  const login =async(token: string, userData:User) => {
+  const login = async (token: string, userData: User) => {
     try {
       setToken(token);
       setUser(userData);
@@ -107,7 +108,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Login error:', error);
       throw error;
     }
-  }
+  };
+
+  const updateUser = (userData: User) => {
+    setUser(userData);
+    StorageService.setObject(StorageKeys.USER_DATA, userData);
+  };
    
   const logout = async () => {
     try {
@@ -123,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, sendOTP, verifyOTP,login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, sendOTP, verifyOTP, login, logout, updateUser, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

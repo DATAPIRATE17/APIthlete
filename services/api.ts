@@ -327,11 +327,10 @@ class ApiService {
   }
 
   // Registration
- // In api.ts
   async registerUser(formData: FormData): Promise<LoginResponse> {
     const url = `${this.baseURL}/api/auth/register`;
   
-  // Don't set Content-Type header - let the browser set it with the proper boundary
+    // Don't set Content-Type header - let the browser set it with the proper boundary
     const headers: HeadersInit = {};
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
@@ -435,6 +434,27 @@ class ApiService {
   // Get Trainer by ID
   async getTrainerById(trainerID: string): Promise<{ trainer: TrainerResponse }> {
     return this.request<{ trainer: TrainerResponse }>(`/api/trainers/${trainerID}`);
+  }
+
+  // Gym Code Validation (Backend-ready)
+  async validateGymCode(code: string): Promise<{ success: boolean; gym?: GymInfo }> {
+    return this.request<{ success: boolean; gym?: GymInfo }>('/api/gym/validate-code', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  }
+
+  // QR Code Validation (Backend-ready)
+  async validateQRCode(qrData: string): Promise<{ success: boolean; gym?: GymInfo }> {
+    return this.request<{ success: boolean; gym?: GymInfo }>('/api/gym/validate-qr', {
+      method: 'POST',
+      body: JSON.stringify({ qrData }),
+    });
+  }
+
+  // Get Gym Info by Code (Backend-ready)
+  async getGymInfoByCode(code: string): Promise<{ gym: GymInfo }> {
+    return this.request<{ gym: GymInfo }>(`/api/gym/info/${code}`);
   }
 }
 

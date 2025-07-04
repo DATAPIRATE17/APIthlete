@@ -410,7 +410,7 @@ export default function DashboardScreen() {
       paddingBottom: 100,
     },
     heroSection: {
-      backgroundColor: theme.primary,
+      backgroundColor: '#000',
       paddingHorizontal: 20,
       paddingVertical: 32,
       position: 'relative',
@@ -436,7 +436,7 @@ export default function DashboardScreen() {
       marginBottom: 20,
     },
     membershipCard: {
-      backgroundColor: 'rgba(255,255,255,0.15)',
+      backgroundColor: theme.primary,
       borderRadius: 16,
       padding: 16,
       marginBottom: 16,
@@ -463,7 +463,7 @@ export default function DashboardScreen() {
     },
     checkInButton: {
       flex: 1,
-      backgroundColor: 'rgba(255,255,255,0.2)',
+      backgroundColor: theme.primary,
       paddingVertical: 12,
       borderRadius: 12,
       alignItems: 'center',

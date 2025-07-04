@@ -20,6 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Linking from 'expo-linking';
+import * as Sharing from 'expo-sharing';
 
 const { width } = Dimensions.get('window');
 const API_BASE_URL = 'https://portal.flexzonegym.com';
@@ -60,6 +61,7 @@ export default function ProfileSettingsScreen() {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [downloadingInvoice, setDownloadingInvoice] = useState<string | null>(null);
+  const [sharingInvoice, setSharingInvoice] = useState<string | null>(null);
   const [gymInfo, setGymInfo] = useState<GymInfo | null>(null);
   const [formData, setFormData] = useState({
     full_name: '',
@@ -138,19 +140,32 @@ export default function ProfileSettingsScreen() {
         throw new Error('Authentication token missing');
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/gym/gym-info`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      // TODO: Replace with actual API call when backend is ready
+      // const response = await fetch(`${API_BASE_URL}/api/gym/gym-info`, {
+      //   headers: {
+      //     'Authorization': `Bearer ${token}`,
+      //     'Content-Type': 'application/json'
+      //   }
+      // });
+      // 
+      // if (!response.ok) {
+      //   throw new Error('Failed to load gym info');
+      // }
+      // 
+      // const data = await response.json();
+      // setGymInfo(data.gym || null);
+
+      // Mock data for now - this will be replaced with backend data
+      setGymInfo({
+        name: 'APIthlete Fitness Center',
+        address: '123 Fitness Street, Gym City, GC 12345',
+        phone: '(555) 123-4567',
+        email: 'info@apithlete.com',
+        logo: {
+          contentType: 'image/jpeg',
+          base64: '' // This would come from backend
         }
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to load gym info');
-      }
-      
-      const data = await response.json();
-      setGymInfo(data.gym || null);
     } catch (error) {
       console.error('Error loading gym info:', error);
     }
@@ -414,102 +429,411 @@ export default function ProfileSettingsScreen() {
     return `
       <html>
         <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Payment Receipt - ${payment.invoice_number}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-            .gym-info { margin-bottom: 15px; }
-            .gym-logo { max-width: 150px; max-height: 80px; margin-bottom: 10px; }
-            .gym-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
-            .gym-contact { font-size: 12px; color: #666; margin-bottom: 2px; }
-            .title { font-size: 24px; font-weight: bold; margin-bottom: 20px; text-align: center; }
-            .subtitle { font-size: 14px; margin-bottom: 5px; color: #666; text-align: center; }
-            .info-container { display: flex; justify-content: space-between; margin-bottom: 20px; }
-            .info-column { width: 48%; }
-            .info-title { font-size: 12px; color: #999; margin-bottom: 3px; }
-            .info-text { font-size: 14px; margin-bottom: 10px; }
-            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            th, td { padding: 8px; text-align: left; border-bottom: 1px solid #eee; }
-            th { background-color: #f5f5f5; font-weight: bold; }
-            .total-row { display: flex; justify-content: flex-end; margin-top: 20px; }
-            .total-text { font-size: 14px; font-weight: bold; margin-right: 10px; }
-            .total-amount { font-size: 14px; font-weight: bold; }
-            .status { 
-              display: inline-block; 
-              padding: 5px; 
-              border-radius: 5px; 
-              font-size: 14px; 
-              margin-bottom: 10px;
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
             }
-            .completed { background-color: #E6F7E6; color: #2E7D32; }
-            .pending { background-color: #FFF8E1; color: #F57F17; }
-            .failed { background-color: #FFEBEE; color: #C62828; }
-            .footer { text-align: center; font-size: 10px; color: #999; margin-top: 30px; }
+            
+            body { 
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              background: #fff;
+              padding: 40px 20px;
+            }
+            
+            .invoice-container {
+              max-width: 800px;
+              margin: 0 auto;
+              background: white;
+              border-radius: 12px;
+              box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+              overflow: hidden;
+            }
+            
+            .header {
+              background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+              color: white;
+              padding: 40px;
+              position: relative;
+            }
+            
+            .header::before {
+              content: '';
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="50" cy="10" r="0.5" fill="rgba(255,255,255,0.05)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+              opacity: 0.3;
+            }
+            
+            .header-content {
+              position: relative;
+              z-index: 1;
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              flex-wrap: wrap;
+              gap: 20px;
+            }
+            
+            .gym-info {
+              flex: 1;
+              min-width: 250px;
+            }
+            
+            .gym-logo {
+              width: 80px;
+              height: 80px;
+              border-radius: 12px;
+              margin-bottom: 16px;
+              border: 3px solid rgba(255,255,255,0.2);
+              object-fit: cover;
+            }
+            
+            .gym-name {
+              font-size: 28px;
+              font-weight: 700;
+              margin-bottom: 8px;
+              text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            
+            .gym-contact {
+              font-size: 14px;
+              opacity: 0.9;
+              margin-bottom: 4px;
+            }
+            
+            .invoice-title {
+              text-align: right;
+              flex: 1;
+              min-width: 200px;
+            }
+            
+            .title {
+              font-size: 36px;
+              font-weight: 800;
+              margin-bottom: 8px;
+              text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            
+            .subtitle {
+              font-size: 16px;
+              opacity: 0.9;
+              margin-bottom: 4px;
+            }
+            
+            .content {
+              padding: 40px;
+            }
+            
+            .info-section {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 40px;
+              margin-bottom: 40px;
+            }
+            
+            @media (max-width: 600px) {
+              .info-section {
+                grid-template-columns: 1fr;
+                gap: 30px;
+              }
+            }
+            
+            .info-block {
+              background: #f8f9fa;
+              padding: 24px;
+              border-radius: 12px;
+              border-left: 4px solid #22C55E;
+            }
+            
+            .info-title {
+              font-size: 12px;
+              font-weight: 700;
+              color: #6b7280;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              margin-bottom: 12px;
+            }
+            
+            .info-text {
+              font-size: 16px;
+              color: #1f2937;
+              margin-bottom: 8px;
+              font-weight: 500;
+            }
+            
+            .status-badge {
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              padding: 8px 16px;
+              border-radius: 20px;
+              font-size: 14px;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            
+            .status-completed {
+              background: #dcfce7;
+              color: #166534;
+              border: 1px solid #bbf7d0;
+            }
+            
+            .status-pending {
+              background: #fef3c7;
+              color: #92400e;
+              border: 1px solid #fde68a;
+            }
+            
+            .status-failed {
+              background: #fee2e2;
+              color: #991b1b;
+              border: 1px solid #fecaca;
+            }
+            
+            .payment-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 30px 0;
+              background: white;
+              border-radius: 12px;
+              overflow: hidden;
+              box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            }
+            
+            .payment-table th {
+              background: #f8f9fa;
+              padding: 20px;
+              text-align: left;
+              font-weight: 700;
+              color: #374151;
+              font-size: 14px;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              border-bottom: 2px solid #e5e7eb;
+            }
+            
+            .payment-table td {
+              padding: 20px;
+              border-bottom: 1px solid #f3f4f6;
+              font-size: 15px;
+              color: #1f2937;
+            }
+            
+            .payment-table tr:last-child td {
+              border-bottom: none;
+            }
+            
+            .payment-table tr:hover {
+              background: #f9fafb;
+            }
+            
+            .amount-cell {
+              font-weight: 700;
+              color: #22C55E;
+              font-size: 16px;
+            }
+            
+            .total-section {
+              background: #f8f9fa;
+              padding: 30px;
+              border-radius: 12px;
+              margin: 30px 0;
+              border: 2px solid #e5e7eb;
+            }
+            
+            .total-row {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 12px;
+            }
+            
+            .total-row:last-child {
+              margin-bottom: 0;
+              padding-top: 12px;
+              border-top: 2px solid #d1d5db;
+            }
+            
+            .total-label {
+              font-size: 16px;
+              color: #6b7280;
+              font-weight: 500;
+            }
+            
+            .total-amount {
+              font-size: 18px;
+              font-weight: 700;
+              color: #1f2937;
+            }
+            
+            .grand-total .total-label {
+              font-size: 20px;
+              font-weight: 700;
+              color: #1f2937;
+            }
+            
+            .grand-total .total-amount {
+              font-size: 24px;
+              font-weight: 800;
+              color: #22C55E;
+            }
+            
+            .footer {
+              background: #1f2937;
+              color: white;
+              padding: 30px 40px;
+              text-align: center;
+            }
+            
+            .footer-content {
+              max-width: 600px;
+              margin: 0 auto;
+            }
+            
+            .thank-you {
+              font-size: 18px;
+              font-weight: 600;
+              margin-bottom: 12px;
+            }
+            
+            .footer-text {
+              font-size: 14px;
+              opacity: 0.8;
+              line-height: 1.6;
+            }
+            
+            .divider {
+              height: 2px;
+              background: linear-gradient(90deg, transparent, #22C55E, transparent);
+              margin: 30px 0;
+            }
+            
+            @media print {
+              body {
+                padding: 0;
+              }
+              
+              .invoice-container {
+                box-shadow: none;
+                border-radius: 0;
+              }
+            }
           </style>
         </head>
         <body>
-          <div class="header">
-            <div>
-              <div class="gym-info">
-                ${logoData ? `<img src="${logoData}" class="gym-logo" alt="Gym Logo" />` : ''}
-                <div class="gym-name">${gymInfo?.name || 'Your Gym Name'}</div>
-                <div class="gym-contact">${gymInfo?.address || '123 Gym Street, Fitness City'}</div>
-                <div class="gym-contact">Phone: ${gymInfo?.phone || '(123) 456-7890'}</div>
-                <div class="gym-contact">Email: ${gymInfo?.email || 'info@yourgym.com'}</div>
+          <div class="invoice-container">
+            <div class="header">
+              <div class="header-content">
+                <div class="gym-info">
+                  ${logoData ? `<img src="${logoData}" class="gym-logo" alt="Gym Logo" />` : ''}
+                  <div class="gym-name">${gymInfo?.name || 'APIthlete Fitness Center'}</div>
+                  <div class="gym-contact">${gymInfo?.address || '123 Fitness Street, Gym City, GC 12345'}</div>
+                  <div class="gym-contact">📞 ${gymInfo?.phone || '(555) 123-4567'}</div>
+                  <div class="gym-contact">✉️ ${gymInfo?.email || 'info@apithlete.com'}</div>
+                </div>
+                <div class="invoice-title">
+                  <div class="title">RECEIPT</div>
+                  <div class="subtitle">Invoice #${payment.invoice_number}</div>
+                  <div class="subtitle">${new Date(payment.payment_date).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}</div>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div>
-            <div class="title">PAYMENT RECEIPT</div>
-            <div class="subtitle">Invoice #${payment.invoice_number}</div>
-            <div class="subtitle">Date: ${new Date(payment.payment_date).toLocaleDateString()}</div>
-          </div>
+            <div class="content">
+              <div class="info-section">
+                <div class="info-block">
+                  <div class="info-title">Billed To</div>
+                  <div class="info-text">${payment.full_name}</div>
+                  <div class="info-text">${payment.email}</div>
+                  <div class="info-text">Member ID: ${user?.membershipID}</div>
+                </div>
+                <div class="info-block">
+                  <div class="info-title">Payment Details</div>
+                  <div class="info-text">Transaction ID: ${payment.transactionID}</div>
+                  <div class="info-text">Payment Date: ${new Date(payment.payment_date).toLocaleDateString()}</div>
+                  <div class="status-badge ${isCompleted ? 'status-completed' : safeStatus === 'pending' ? 'status-pending' : 'status-failed'}">
+                    ${isCompleted ? '✓ PAID' : payment.status.toUpperCase()}
+                  </div>
+                </div>
+              </div>
 
-          <div class="info-container">
-            <div class="info-column">
-              <div class="info-title">BILLED TO:</div>
-              <div class="info-text">${payment.full_name}</div>
-              <div class="info-text">${payment.email}</div>
-              <div class="info-text">Membership ID: ${user?.membershipID}</div>
-            </div>
-            <div class="info-column">
-              <div class="info-title">PAYMENT DETAILS:</div>
-              <div class="info-text">Transaction ID: ${payment.transactionID}</div>
-              <div class="info-text">Status: ${payment.status}</div>
-              <div class="status ${isCompleted ? 'completed' : safeStatus}">
-                ${isCompleted ? 'PAID' : payment.status.toUpperCase()}
+              <div class="divider"></div>
+
+              <table class="payment-table">
+                <thead>
+                  <tr>
+                    <th>Description</th>
+                    <th>Membership Period</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <strong>${payment.membership_plan} Membership</strong>
+                      <br>
+                      <small style="color: #6b7280;">Premium fitness access and facilities</small>
+                    </td>
+                    <td>
+                      ${new Date(payment.payment_date).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      })} - 
+                      ${new Date(payment.renewal_date).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      })}
+                    </td>
+                    <td class="amount-cell">${payment.amount_paid}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="total-section">
+                <div class="total-row">
+                  <span class="total-label">Subtotal:</span>
+                  <span class="total-amount">${payment.amount_paid}</span>
+                </div>
+                <div class="total-row">
+                  <span class="total-label">Tax (Included):</span>
+                  <span class="total-amount">₹0.00</span>
+                </div>
+                <div class="total-row grand-total">
+                  <span class="total-label">Total Amount:</span>
+                  <span class="total-amount">${payment.amount_paid}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <table>
-            <thead>
-              <tr>
-                <th>DESCRIPTION</th>
-                <th>MEMBERSHIP PERIOD</th>
-                <th>AMOUNT</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>${payment.membership_plan} Membership</td>
-                <td>
-                  ${new Date(payment.payment_date).toLocaleDateString()} - 
-                  ${new Date(payment.renewal_date).toLocaleDateString()}
-                </td>
-                <td>${payment.amount_paid}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div class="total-row">
-            <div class="total-text">TOTAL:</div>
-            <div class="total-amount">${payment.amount_paid}</div>
-          </div>
-
-          <div class="footer">
-            <div>Thank you for choosing ${gymInfo?.name || 'Your Gym'}</div>
-            <div>© ${new Date().getFullYear()} ${gymInfo?.name || 'Your Gym'}. All rights reserved.</div>
+            <div class="footer">
+              <div class="footer-content">
+                <div class="thank-you">Thank you for choosing ${gymInfo?.name || 'APIthlete Fitness Center'}!</div>
+                <div class="footer-text">
+                  This receipt serves as proof of payment for your membership.
+                  <br>
+                  For any queries, please contact us at ${gymInfo?.email || 'info@apithlete.com'}
+                  <br><br>
+                  © ${new Date().getFullYear()} ${gymInfo?.name || 'APIthlete Fitness Center'}. All rights reserved.
+                </div>
+              </div>
+            </div>
           </div>
         </body>
       </html>
@@ -526,7 +850,17 @@ export default function ProfileSettingsScreen() {
     setDownloadingInvoice(payment.id);
     try {
       const htmlContent = generateInvoiceHTML(payment);
-      const { uri } = await Print.printToFileAsync({ html: htmlContent, width: 612, height: 792 });
+      const { uri } = await Print.printToFileAsync({ 
+        html: htmlContent, 
+        width: 612, 
+        height: 792,
+        margins: {
+          left: 20,
+          top: 20,
+          right: 20,
+          bottom: 20,
+        }
+      });
 
       const fileName = `Invoice_${payment.invoice_number}_${Date.now()}.pdf`;
       const newUri = `${FileSystem.documentDirectory}${fileName}`;
@@ -547,6 +881,10 @@ export default function ProfileSettingsScreen() {
             onPress: () => Linking.openURL(newUri) 
           },
           { 
+            text: 'Share', 
+            onPress: () => handleShareInvoice(newUri, payment)
+          },
+          { 
             text: 'Cancel', 
             style: 'cancel' 
           },
@@ -557,6 +895,59 @@ export default function ProfileSettingsScreen() {
       Alert.alert('Error', 'Failed to download invoice');
     } finally {
       setDownloadingInvoice(null);
+    }
+  };
+
+  const handleShareInvoice = async (payment: Payment, fileUri?: string) => {
+    const normalizedStatus = payment.status.toLowerCase();
+    if (normalizedStatus !== 'completed' && normalizedStatus !== 'paid') {
+      Alert.alert('Error', 'Invoice is only available for completed payments');
+      return;
+    }
+
+    setSharingInvoice(payment.id);
+    try {
+      let shareUri = fileUri;
+      
+      if (!shareUri) {
+        // Generate PDF if not already generated
+        const htmlContent = generateInvoiceHTML(payment);
+        const { uri } = await Print.printToFileAsync({ 
+          html: htmlContent, 
+          width: 612, 
+          height: 792,
+          margins: {
+            left: 20,
+            top: 20,
+            right: 20,
+            bottom: 20,
+          }
+        });
+
+        const fileName = `Invoice_${payment.invoice_number}_${Date.now()}.pdf`;
+        const newUri = `${FileSystem.documentDirectory}${fileName}`;
+        await FileSystem.moveAsync({ from: uri, to: newUri });
+        shareUri = newUri;
+      }
+
+      // Check if sharing is available
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('Error', 'Sharing is not available on this device');
+        return;
+      }
+
+      await Sharing.shareAsync(shareUri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `Share Invoice ${payment.invoice_number}`,
+        UTI: 'com.adobe.pdf'
+      });
+
+    } catch (error) {
+      console.error('Error sharing invoice:', error);
+      Alert.alert('Error', 'Failed to share invoice');
+    } finally {
+      setSharingInvoice(null);
     }
   };
 
@@ -712,7 +1103,7 @@ export default function ProfileSettingsScreen() {
       backgroundColor: theme.background,
       borderRadius: 8,
       paddingHorizontal: 12,
-      paddingVertical: 10,
+      paddingVertical: 12,
       borderWidth: 1,
       borderColor: theme.border,
     },
@@ -764,7 +1155,7 @@ export default function ProfileSettingsScreen() {
       shadowOpacity: 0.3,
       shadowRadius: 8,
       elevation: 4,
-      bottom:23,
+      bottom: 23,
     },
     saveButtonDisabled: {
       backgroundColor: theme.border,
@@ -1149,11 +1540,11 @@ export default function ProfileSettingsScreen() {
                       </View>
                       
                       <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Renewal Date</Text>
-                <Text style={styles.detailValue}>
-                  {new Date(payment.renewal_date).toLocaleDateString()}
-                </Text>
-              </View>
+                        <Text style={styles.detailLabel}>Renewal Date</Text>
+                        <Text style={styles.detailValue}>
+                          {new Date(payment.renewal_date).toLocaleDateString()}
+                        </Text>
+                      </View>
                       
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>Status</Text>
@@ -1195,6 +1586,31 @@ export default function ProfileSettingsScreen() {
                             (payment.status.toLowerCase() !== 'completed' && payment.status.toLowerCase() !== 'paid') && styles.actionButtonTextDisabled
                           ]}>
                             PDF
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.actionButton,
+                            (payment.status.toLowerCase() !== 'completed' && payment.status.toLowerCase() !== 'paid') && styles.actionButtonDisabled
+                          ]}
+                          onPress={() => handleShareInvoice(payment)}
+                          disabled={(payment.status.toLowerCase() !== 'completed' && payment.status.toLowerCase() !== 'paid') || sharingInvoice === payment.id}
+                        >
+                          {sharingInvoice === payment.id ? (
+                            <ActivityIndicator size="small" color={theme.primary} />
+                          ) : (
+                            <ShareIcon size={10} color={
+                              (payment.status.toLowerCase() === 'completed' || payment.status.toLowerCase() === 'paid') 
+                                ? theme.primary 
+                                : theme.textSecondary
+                            } />
+                          )}
+                          <Text style={[
+                            styles.actionButtonText,
+                            (payment.status.toLowerCase() !== 'completed' && payment.status.toLowerCase() !== 'paid') && styles.actionButtonTextDisabled
+                          ]}>
+                            Share
                           </Text>
                         </TouchableOpacity>
                       </View>

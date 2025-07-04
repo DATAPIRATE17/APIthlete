@@ -11,13 +11,20 @@ import {
   Image,
   Dimensions,
   Alert,
+  Clipboard,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { Phone, ArrowRight, Dumbbell, Shield, UserPlus, ArrowLeft } from 'lucide-react-native';
+import { Phone, ArrowRight, Shield, UserPlus, ArrowLeft } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
+
+interface GymInfo {
+  name: string;
+  logo?: string;
+  address?: string;
+}
 
 export default function LoginScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -27,16 +34,78 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [sessionId, setSessionId] = useState('');
+  const [gymInfo, setGymInfo] = useState<GymInfo | null>(null);
   const router = useRouter();
   const { theme } = useTheme();
   const { sendOTP, verifyOTP, user } = useAuth();
-  const { gymId, gymName } = useLocalSearchParams<{ gymId?: string; gymName?: string }>();
+  const { gymId, gymName, gymLogo } = useLocalSearchParams<{ 
+    gymId?: string; 
+    gymName?: string; 
+    gymLogo?: string; 
+  }>();
 
   useEffect(() => {
     if (user) {
       router.replace('/(tabs)');
     }
   }, [user]);
+
+  useEffect(() => {
+    if (gymId) {
+      loadGymInfo();
+    }
+  }, [gymId]);
+
+  // Backend-ready gym info fetching
+  const loadGymInfo = async () => {
+    try {
+      // TODO: Replace with actual API call when backend is ready
+      // const response = await fetch(`/api/gym/info/${gymId}`, {
+      //   headers: {
+      //     'Content-Type': 'application/json'
+      //   }
+      // });
+      // const data = await response.json();
+      // setGymInfo(data.gym);
+      
+      // For now, use the passed parameters or mock data
+      setGymInfo({
+        name: gymName || 'APIthlete Gym',
+        logo: gymLogo || 'https://images.pexels.com/photos/1552242/pexels-photo-1552242.jpeg',
+        address: 'Fitness Street, Gym City'
+      });
+    } catch (error) {
+      console.error('Error loading gym info:', error);
+      // Fallback to passed parameters
+      setGymInfo({
+        name: gymName || 'APIthlete Gym',
+        logo: gymLogo || 'https://images.pexels.com/photos/1552242/pexels-photo-1552242.jpeg'
+      });
+    }
+  };
+
+  // Auto-fill OTP from clipboard (for SMS auto-detection)
+  useEffect(() => {
+    if (showOTPInput && Platform.OS !== 'web') {
+      const checkClipboard = async () => {
+        try {
+          const clipboardContent = await Clipboard.getString();
+          // Check if clipboard contains a 6-digit number (likely OTP)
+          const otpMatch = clipboardContent.match(/\b\d{6}\b/);
+          if (otpMatch && otpMatch[0] !== otp) {
+            // Auto-fill OTP if found in clipboard
+            setOtp(otpMatch[0]);
+          }
+        } catch (error) {
+          console.log('Clipboard access error:', error);
+        }
+      };
+
+      // Check clipboard periodically for OTP
+      const interval = setInterval(checkClipboard, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [showOTPInput, otp]);
 
   const handleBackToWelcome = () => {
     router.back(); // This will go back to the welcome screen
@@ -87,6 +156,7 @@ export default function LoginScreen() {
       const result = await verifyOTP(sessionId, otp);
       if (result.success) {
         if (result.isNewUser) {
+          // Don't show error message for new users
           router.push({
             pathname: '/register',
             params: { phoneNumber }
@@ -97,9 +167,19 @@ export default function LoginScreen() {
       } else {
         setError('Invalid OTP. Please try again.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Verify OTP error:', error);
-      setError('Verification failed. Please try again.');
+      
+      // Check if it's a "Member not found" error for new users
+      if (error.message && error.message.includes("Member not found")) {
+        // Don't show error for new users, just redirect to registration
+        router.push({
+          pathname: '/register',
+          params: { phoneNumber }
+        });
+      } else {
+        setError('Verification failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -191,6 +271,12 @@ export default function LoginScreen() {
       shadowOpacity: 0.3,
       shadowRadius: 16,
       elevation: 8,
+      overflow: 'hidden',
+    },
+    logoImage: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
     },
     logoText: {
       fontSize: 28,
@@ -211,13 +297,27 @@ export default function LoginScreen() {
       borderRadius: 12,
       padding: 16,
       marginBottom: 24,
+      flexDirection: 'row',
       alignItems: 'center',
     },
+    gymLogo: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      marginRight: 12,
+    },
     gymInfoText: {
-      fontSize: 14,
+      flex: 1,
+    },
+    gymInfoName: {
+      fontSize: 16,
       color: theme.primary,
       fontWeight: '600',
-      textAlign: 'center',
+    },
+    gymInfoSubtext: {
+      fontSize: 12,
+      color: theme.primary,
+      opacity: 0.8,
     },
     formContainer: {
       backgroundColor: theme.surface,
@@ -412,6 +512,17 @@ export default function LoginScreen() {
       marginLeft: 8,
       flex: 1,
     },
+    autoFillNote: {
+      backgroundColor: theme.success + '20',
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 16,
+    },
+    autoFillText: {
+      color: theme.success,
+      fontSize: 12,
+      textAlign: 'center',
+    },
   });
 
   return (
@@ -426,30 +537,54 @@ export default function LoginScreen() {
       />
   
       {/* Back Button - Only show when OTP input is visible */}
-    
+     
         <TouchableOpacity 
           style={styles.backButton}
           onPress={handleBackToWelcome}
         >
           <ArrowLeft size={24} color={theme.text} />
         </TouchableOpacity>
-     
+      
       
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.logoContainer}>
           <View style={styles.logo}>
-            <Dumbbell size={48} color="white" />
+            {gymInfo?.logo ? (
+              <Image
+                source={{ uri: gymInfo.logo }}
+                style={styles.logoImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Image
+                source={require('@/assets/images/api.jpg')}
+                style={styles.logoImage}
+                resizeMode="cover"
+              />
+            )}
           </View>
-          <Text style={styles.logoText}>APIthlete</Text>
+          <Text style={styles.logoText}>{gymInfo?.name || 'APIthlete'}</Text>
           <Text style={styles.subtitle}>Fitness Management System</Text>
         </View>
 
         {/* Show gym info if coming from gym access */}
-        {gymName && (
+        {gymInfo && (
           <View style={styles.gymInfo}>
-            <Text style={styles.gymInfoText}>
-              Logging into {gymName}
-            </Text>
+            {gymInfo.logo && (
+              <Image
+                source={{ uri: gymInfo.logo }}
+                style={styles.gymLogo}
+                resizeMode="cover"
+              />
+            )}
+            <View style={styles.gymInfoText}>
+              <Text style={styles.gymInfoName}>
+                Logging into {gymInfo.name}
+              </Text>
+              <Text style={styles.gymInfoSubtext}>
+                Secure authentication
+              </Text>
+            </View>
           </View>
         )}
 
@@ -476,6 +611,14 @@ export default function LoginScreen() {
               <Text style={styles.successText}>OTP sent successfully to {phoneNumber}</Text>
             </View>
           ) : null}
+
+          {showOTPInput && Platform.OS !== 'web' && (
+            <View style={styles.autoFillNote}>
+              <Text style={styles.autoFillText}>
+                OTP will be auto-filled from SMS if available
+              </Text>
+            </View>
+          )}
 
           {!showOTPInput ? (
             <>
