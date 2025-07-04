@@ -13,15 +13,17 @@ import {
 } from 'react-native';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { Check, Crown, Star, Zap, Shield, Sparkles, Dumbbell, Users, Calendar, Target } from 'lucide-react-native';
+import { Check, Crown, Star, Zap, Sparkles, Target } from 'lucide-react-native';
 
 const API_BASE_URL = 'https://portal.flexzonegym.com';
 const { width } = Dimensions.get('window');
 
 interface MembershipPlan {
   _id: string;
+  planID: string;
   name: string;
   price: number;
+  total_price: number;
   renewal: number;
   description: string;
   perks?: string[];
@@ -31,7 +33,7 @@ interface MembershipPlan {
 
 export default function MembershipPlansScreen() {
   const { theme } = useTheme();
-  const { user, updateUser,token } = useAuth();
+  const { user, updateUser, token } = useAuth();
   const [membershipPlans, setMembershipPlans] = useState<MembershipPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
@@ -72,7 +74,7 @@ export default function MembershipPlansScreen() {
       } else {
         throw new Error(data.message || 'Failed to load membership plans');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading membership plans:', error);
       setError(error.message || 'Failed to load membership plans. Please try again later.');
     } finally {
@@ -123,7 +125,7 @@ export default function MembershipPlansScreen() {
 
     Alert.alert(
       'Upgrade Membership',
-      `You selected ${selectedPlanData?.name} for ₹${selectedPlanData?.price}. Do you want to proceed with payment?`,
+      `You selected ${selectedPlanData?.name} for ₹${selectedPlanData?.total_price}. Do you want to proceed with payment?`,
       [
         { text: 'Cancel', style: 'cancel', onPress: () => setSelectedPlan(null) },
         { 
@@ -143,16 +145,27 @@ export default function MembershipPlansScreen() {
         throw new Error('Authentication required. Please login again.');
       }
 
+      // Validate amount - matches website validation
+      if (!planData.total_price || planData.total_price <= 0) {
+        throw new Error('Invalid membership plan amount');
+      }
+
+      // Create payment payload matching website format
+      const paymentPayload = {
+        membershipID: user.membershipID,
+        membership_plan: planData.name,
+        amount: planData.total_price // Send amount in rupees (not converted to paise)
+      };
+
+      console.log('Payment payload:', paymentPayload); // Debug log
+
       const response = await fetch(`${API_BASE_URL}/api/payment/initiate`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          membershipID: user.membershipID,
-          membership_plan: planData.name
-        }),
+        body: JSON.stringify(paymentPayload),
       });
 
       if (!response.ok) {
@@ -162,18 +175,19 @@ export default function MembershipPlansScreen() {
       
       const data = await response.json();
 
-      if (data.success && data.checkoutUrl) {
-        const canOpen = await Linking.canOpenURL(data.checkoutUrl);
-        if (canOpen) {
-          await Linking.openURL(data.checkoutUrl);
-          pollPaymentStatus(data.orderId);
-        } else {
-          throw new Error('Cannot open payment link');
-        }
-      } else {
-        throw new Error(data.error || 'Failed to initiate payment');
+      if (!data.success || !data.checkoutUrl) {
+        throw new Error(data.error || 'Failed to get payment URL');
       }
-    } catch (error) {
+
+      const canOpen = await Linking.canOpenURL(data.checkoutUrl);
+      if (!canOpen) {
+        throw new Error('Cannot open payment link');
+      }
+
+      await Linking.openURL(data.checkoutUrl);
+      pollPaymentStatus(data.orderId);
+
+    } catch (error: any) {
       console.error('Payment error:', error);
       setError(error.message || 'Failed to process payment. Please try again.');
       setSelectedPlan(null);
@@ -324,20 +338,6 @@ export default function MembershipPlansScreen() {
       fontSize: 12,
       fontWeight: '700',
       marginLeft: 4,
-    },
-    savingsBadge: {
-      position: 'absolute',
-      top: -10,
-      left: 20,
-      backgroundColor: theme.success,
-      paddingHorizontal: 12,
-      paddingVertical: 4,
-      borderRadius: 12,
-    },
-    savingsText: {
-      color: 'white',
-      fontSize: 10,
-      fontWeight: '700',
     },
     planHeader: {
       flexDirection: 'row',
@@ -599,8 +599,13 @@ export default function MembershipPlansScreen() {
 
             <View style={styles.priceContainer}>
               <Text style={[styles.planPrice, { color: plan.color || theme.primary }]}>
-                ₹{plan.price}
+                ₹{plan.total_price}
               </Text>
+              {plan.total_price > plan.price && (
+                <Text style={styles.originalPrice}>
+                  ₹{plan.price}
+                </Text>
+              )}
             </View>
 
             <View style={styles.featuresSection}>
