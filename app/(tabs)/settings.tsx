@@ -764,6 +764,7 @@ export default function ProfileSettingsScreen() {
       shadowOpacity: 0.3,
       shadowRadius: 8,
       elevation: 4,
+      bottom:23,
     },
     saveButtonDisabled: {
       backgroundColor: theme.border,
