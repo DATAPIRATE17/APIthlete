@@ -657,9 +657,6 @@ export default function GymAccessScreen() {
       elevation: 4,
       bottom:70,
     },
-    continueButtonDisabled: {
-      backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    },
     continueButtonText: {
       color: '#10b981',
       fontSize: 16,

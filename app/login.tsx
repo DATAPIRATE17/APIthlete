@@ -440,7 +440,7 @@ export default function LoginScreen() {
           <View style={styles.logo}>
             <Dumbbell size={48} color="white" />
           </View>
-          <Text style={styles.logoText}>Apiathelete</Text>
+          <Text style={styles.logoText}>APIthlete</Text>
           <Text style={styles.subtitle}>Fitness Management System</Text>
         </View>
 
