@@ -4,6 +4,7 @@ export const StorageKeys = {
   AUTH_TOKEN: '@auth_token',
   USER_DATA: '@user_data',
   THEME_PREFERENCE: '@theme_preference',
+  SAVED_GYMS: '@saved_gyms',
 } as const;
 
 export class StorageService {
